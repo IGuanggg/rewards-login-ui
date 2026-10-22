@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="color-scheme" content="dark light" />
+        <title>Rewards 控制台</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/css/styles.css" />
+        <link
+            rel="icon"
+            href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237f5af0'/%3E%3Cpath d='M9 20.5 14 11l4 7 5-9' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+        />
+    </head>
+    <body>
+        <button class="icon-btn entry-theme" id="btn-entry-theme" type="button" title="切换主题" aria-label="切换主题">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4m0-12.8L17 7M7 17l-1.4 1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="3.6" stroke="currentColor" stroke-width="1.7"/></svg>
+        </button>
+        <div class="aurora" aria-hidden="true">
+            <span class="aurora__blob aurora__blob--violet"></span>
+            <span class="aurora__blob aurora__blob--sea"></span>
+        </div>
+        <svg class="filaments" viewBox="0 0 1440 900" fill="none" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+            <path d="M720 450C720 450 742.5 440.3 755.2 425.6C768 410.9 778.9 418.7 789.5 401.5C800.1 384.3 817.1 389.3 826.7 380.4C836.4 371.6 852 364.8 863.2 356.2C874.4 347.7 878 342.7 898.9 333.2C919.7 323.8 923.6 319.9 934.9 310.2C946.1 300.5 960.8 300.8 970.6 287.7C980.4 274.6 993.5 273.3 1004.9 263.1C1016.2 252.8 1026.4 250.8 1038.2 242.1C1050 233.4 1065.2 230.4 1074.6 215.7C1084.1 201 1085.5 209.1 1112.7 194.9C1139.8 180.6 1132.5 178.2 1146.4 170.6C1160.4 163.1 1169 158.6 1181.5 148C1194 137.4 1191.2 131.4 1217.6 125.6C1243.9 119.9 1234.2 118.9 1254.5 100.8C1274.9 82.8 1275.1 92.9 1290.4 76.1C1305.6 59.3 1313.9 62.2 1323.2 56.8C1332.5 51.3 1347.9 42.8 1362 32.1C1376 21.5 1374.1 25.2 1397.1 10.2C1420.1 -4.8 1421.4 -3.2 1431.5 -15" stroke="var(--f1)" />
+            <path d="M720 450C720 450 712.3 437.8 690.2 407.2C668.2 376.5 672.5 394.3 666 365.8C659.4 337.3 647.9 347.5 636.9 323.2C626 298.9 626.8 303.6 609.9 281C593 258.4 598.7 255.3 582.3 242.5C566 229.7 566.1 217.7 559.2 197.1C552.3 176.6 549.3 171.8 529.3 156.5C509.3 141.2 522.1 134.1 505.2 115.7C488.3 97.3 482.7 82.6 473.6 70.8C464.5 59 464.8 50.2 447 32.1C429.2 13.9 436.3 0.9 423.5 -12.7C410.8 -26.2 407.4 -44.1 394.4 -56.5C381.3 -68.9 373.7 -72.7 365.6 -96.2C357.5 -119.7 358.4 -111.5 338.2 -136.5C318.1 -161.5 322.8 -149.5 315.3 -181.8C307.8 -214 294.6 -202.6 285.8 -223.3C277 -244 275.2 -244.1 258.6 -263.9" stroke="var(--f2)" />
+            <path d="M720 450C720 450 696.4 458.8 682.4 473C668.4 487.1 673.2 487.5 647.9 492.9C622.6 498.3 636.9 499.9 609 512.9C581.2 526 596.8 528.5 571.9 533.8C547.1 539.1 551.8 548.7 536.9 556.8C522 565 515.6 563.3 497.6 575.2C479.6 587 484.3 590.4 461.1 598.7C437.9 607 442.5 605.2 423.6 618.4C404.7 631.6 402.4 629.5 390.8 641.6C379.2 653.6 369.8 658.2 353.2 663.9C336.7 669.7 330.2 674.7 312.8 684.1C295.5 693.5 288.7 698.8 278.2 704C267.7 709.3 258.4 712.5 240.4 726.7C222.4 740.8 230.1 738.4 203.4 745.6C176.8 752.8 193.7 752.5 166.4 767.1C139.1 781.8 151.3 783.6 130.2 791.1C109 798.5 116.5 802.7 96.1 808.8C75.7 814.9 83.9 819.5 59.5 830.6C35 841.6 48.3 847.9 21.8 853.9C-4.6 859.9 10.6 869.1 -16.4 874.5" stroke="var(--f3)" />
+            <path d="M720 450C720 450 738.983 448.651 790.209 446.852C841.436 445.052 816.31 441.421 861.866 437.296C907.422 433.172 886.273 437.037 930.656 436.651C975.04 436.264 951.399 432.343 1001.57 425.74C1051.73 419.138 1020.72 425.208 1072.85 424.127C1124.97 423.047 1114.39 420.097 1140.02 414.426C1165.65 408.754 1173.1 412.143 1214.55 411.063C1256.01 409.983 1242.78 406.182 1285.56 401.536C1328.35 396.889 1304.66 400.796 1354.41 399.573C1404.16 398.35 1381.34 394.315 1428.34 389.376C1475.35 384.438 1445.96 386.509 1497.93 385.313C1549.9 384.117 1534.63 382.499 1567.23 381.48" stroke="var(--f4)" />
+            <path d="M720 450C720 450 711.6 475.85 701 516.1C690.5 556.4 697.1 559.5 689.4 579.1C681.8 598.7 679.1 597.5 675.4 642.7C671.7 687.9 663.4 677 657.8 700.2C652.3 723.3 651.1 724.9 636.9 764.5C622.7 804.2 631.2 802.9 625.4 827.1C619.6 851.3 613.7 856.3 605.9 892.3C598.1 928.2 595.4 924.3 588.9 957.8C582.4 991.3 583.1 991.2 575.6 1022.6C568 1054.1 566.8 1058.5 558.1 1084.3C549.5 1110.2 554 1129.1 542.4 1149.3C530.8 1169.4 538.3 1180.4 530.3 1207.3C522.4 1234.2 520.8 1245.5 512.2 1274.2" stroke="var(--f5)" />
+            <path d="M720 450C720 450 730.571 424.312 761.424 411.44C792.277 398.569 772.385 393.283 804.069 377.232C835.752 361.182 829.975 361.373 848.987 342.782C867.999 324.192 877.583 330.096 890.892 303.897C904.201 277.698 910.277 282.253 937.396 264.293C964.514 246.333 949.357 246.834 978.7 230.438C1008.04 214.042 990.424 217.952 1021.51 193.853C1052.6 169.753 1054.28 184.725 1065.97 158.075C1077.65 131.425 1087.76 139.068 1111.12 120.345C1134.49 101.622 1124.9 104.858 1151.67 86.3162C1178.43 67.7741 1167.09 66.2676 1197.53 47.2606C1227.96 28.2536 1225.78 23.2186 1239.27 12.9649C1252.76 2.7112 1269.32 -9.47929 1282.88 -28.5587C1296.44 -47.6381 1305.81 -41.3853 1323.82 -62.7027C1341.83 -84.0202 1340.32 -82.3794 1368.98 -98.9326" stroke="var(--f6)" />
+        </svg>
+        <div class="grain" aria-hidden="true"></div>
+
+        <main class="shell">
+            <!-- ══ 1. 面板解锁（唯一入口，居中单列） ══════════════ -->
+            <section class="view view--unlock" id="view-unlock" hidden>
+                <div class="unlock">
+                    <div class="unlock__mark" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" fill="none">
+                            <path d="M8.5 21.5 14 10.5l4.2 7.4L23.5 9" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </div>
+
+                    <p class="unlock__eyebrow">REWARDS CONSOLE</p>
+                    <h1 class="unlock__title">欢迎回来</h1>
+                    <p class="unlock__sub">在本机管理账号与登录状态</p>
+
+                    <form id="unlock-form" class="unlock__form" novalidate>
+                        <label class="field">
+                            <span class="field__label">面板访问密码</span>
+                            <span class="field__control field__control--mono">
+                                <input id="unlock-token" type="password" spellcheck="false" autocomplete="current-password" placeholder="输入面板访问密码" />
+                                <button class="ghost-btn" type="button" id="btn-reveal-token">显示</button>
+                            </span>
+                        </label>
+
+                        <p class="form-error" id="unlock-error" role="alert" hidden></p>
+
+                        <button class="liquid-btn" type="submit" id="btn-unlock">
+                            <span class="liquid-btn__icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10.5" width="14" height="9" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 10.5V8a3.5 3.5 0 1 1 7 0v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                            </span>
+                            <span class="liquid-btn__text">进入控制台</span>
+                        </button>
+                    </form>
+
+                    <details class="unlock__help">
+                        <summary>找不到访问密码？</summary>
+                        <p class="unlock__hint" id="unlock-hint">从启动面板的终端复制访问密码，也可在面板目录的 <code>config.json</code> 中查看。</p>
+                    </details>
+
+                    <p class="unlock__terms">
+                        继续即表示同意
+                        <button type="button" class="link-btn" data-dialog="dlg-terms">服务条款</button>
+                        与
+                        <button type="button" class="link-btn" data-dialog="dlg-privacy">隐私说明</button>
+                    </p>
+                </div>
+            </section>
+
+            <!-- ══ 2. 首次设置：连接上游实例 ══════════════════════ -->
+            <section class="view view--setup" id="view-setup" hidden>
+                <div class="setup">
+                    <header class="setup__head">
+                        <span class="brand__mark brand__mark--sm" aria-hidden="true">
+                            <svg viewBox="0 0 32 32" fill="none"><path d="M8.5 21.5 14 10.5l4.2 7.4L23.5 9" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        <div>
+                            <h1>连接本机服务</h1>
+                            <p class="muted">选择 Microsoft Rewards 脚本的安装目录。连接后，即可添加账号并在浏览器中完成授权。</p>
+                        </div>
+                    </header>
+
+                    <label class="field">
+                        <span class="field__label">脚本安装目录</span>
+                        <span class="field__control field__control--mono">
+                            <svg class="field__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h3l1.6 2h6.4A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                            <input id="setup-path" type="text" spellcheck="false" placeholder="例如 D:\Microsoft-Rewards-Script" />
+                            <button class="ghost-btn" type="button" id="btn-setup-detect">自动探测</button>
+                        </span>
+                    </label>
+
+                    <ul class="checklist" id="setup-checks"></ul>
+                    <p class="form-error" id="setup-error" role="alert" hidden></p>
+
+                    <div class="setup__actions">
+                        <button class="liquid-btn liquid-btn--solid" id="btn-setup-connect"><span class="liquid-btn__text">检查并连接</span></button>
+                    </div>
+
+                    <p class="setup__note">
+                        需要仓库里存在 <code>package.json</code>、<code>scripts/main/manualLogin.js</code> 与 <code>scripts/utils.js</code>。
+                        检测不通过时不会写入任何文件。
+                    </p>
+                </div>
+            </section>
+
+            <!-- ══ 3. 控制台 ══════════════════════════════════════ -->
+            <section class="view view--app" id="view-app" hidden>
+                <header class="topbar">
+                    <div class="topbar__left">
+                        <span class="brand__mark brand__mark--sm" aria-hidden="true">
+                            <svg viewBox="0 0 32 32" fill="none"><path d="M8.5 21.5 14 10.5l4.2 7.4L23.5 9" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        <div class="topbar__title">
+                            <strong>Rewards 控制台</strong>
+                            <span id="topbar-path" class="mono-dim">—</span>
+                        </div>
+                    </div>
+
+                    <nav class="tabs" id="tabs" role="tablist" aria-label="主导航">
+                        <button class="tab is-active" role="tab" data-tab="accounts" aria-selected="true">账号授权</button>
+                        <button class="tab" role="tab" data-tab="logs" aria-selected="false">运行日志</button>
+                        <button class="tab" role="tab" data-tab="settings" aria-selected="false">环境与设置</button>
+                    </nav>
+
+                    <div class="topbar__right">
+                        <span class="pill pill--dot" id="pill-env"><i></i><span>环境</span></span>
+                        <span class="pill pill--dot" id="pill-api"><i></i><span>签到接口</span></span>
+                        <button class="icon-btn" id="btn-theme" title="切换主题" aria-label="切换主题">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4m0-12.8L17 7M7 17l-1.4 1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="3.6" stroke="currentColor" stroke-width="1.7"/></svg>
+                        </button>
+                        <button class="ghost-btn ghost-btn--bordered" id="btn-logout">退出</button>
+                    </div>
+                </header>
+
+                <div class="panel-grid" id="panel-accounts">
+                    <div class="workspace-heading">
+                        <div>
+                            <h1>账号与授权</h1>
+                            <p>管理你的微软账号，随时查看已保存的登录状态。</p>
+                        </div>
+                        <a class="ghost-btn ghost-btn--bordered workspace-heading__action" id="btn-add-account" href="#account-editor">添加账号 <span aria-hidden="true">＋</span></a>
+                    </div>
+                    <div class="panel-grid__col">
+                        <section class="card">
+                            <div class="card__head">
+                                <div>
+                                    <h2>我的账号</h2>
+                                    <p class="muted" id="accounts-hint">读取中…</p>
+                                </div>
+                                <div class="card__head-actions">
+                                    <button class="ghost-btn ghost-btn--bordered" id="btn-refresh">
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        刷新
+                                    </button>
+                                    <button class="ghost-btn ghost-btn--bordered" id="btn-run-all" title="通过上游 Control API 运行签到">运行签到</button>
+                                </div>
+                            </div>
+                            <ul class="account-list" id="account-list"></ul>
+                            <div class="empty-state" id="accounts-empty" hidden>
+                                <p class="empty-state__title">还没有微软账号</p>
+                                <p class="muted">添加邮箱后，在弹出的浏览器里完成一次登录。登录状态保存后，下次不用再填。</p>
+                                <button class="liquid-btn" type="button" id="btn-empty-add">添加账号</button>
+                            </div>
+                        </section>
+
+                        <section class="card">
+                            <div class="card__head">
+                                <div>
+                                    <h2>最近活动</h2>
+                                    <p class="muted">查看最近的账号授权结果</p>
+                                </div>
+                                <span class="tag tag--muted" id="runs-count">0 条</span>
+                            </div>
+                            <ul class="run-list" id="run-list"></ul>
+                        </section>
+                    </div>
+
+                    <div class="form-backdrop">
+                    <section class="card card--form" id="account-editor">
+                        <div class="card__head">
+                            <div>
+                                <h2 id="form-title">添加微软账号</h2>
+                                <p class="muted" id="form-lead">只需邮箱。保存后点「连接」，在弹出的浏览器里登录一次。</p>
+                            </div>
+                            <button class="icon-btn form-close" id="btn-close-form" type="button" aria-label="关闭" hidden>
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                            </button>
+                        </div>
+
+                        <form id="account-form" class="account-form" novalidate autocomplete="off">
+                            <label class="field">
+                                <span class="field__label">微软账号邮箱</span>
+                                <span class="field__control">
+                                    <svg class="field__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                                    <input id="f-email" name="email" type="email" spellcheck="false" placeholder="someone@outlook.com" required />
+                                </span>
+                            </label>
+
+                            <div class="field-row">
+                                <label class="field">
+                                    <span class="field__label">国家/地区</span>
+                                    <span class="field__control field__control--mono">
+                                        <input id="f-geo" name="geoLocale" type="text" spellcheck="false" placeholder="auto" value="auto" />
+                                    </span>
+                                </label>
+                                <label class="field">
+                                    <span class="field__label">语言</span>
+                                    <span class="field__control field__control--mono">
+                                        <input id="f-lang" name="langCode" type="text" spellcheck="false" placeholder="zh-CN" value="zh-CN" />
+                                    </span>
+                                </label>
+                            </div>
+
+                            <details class="advanced">
+                                <summary>登录凭据与高级设置<span class="chev" aria-hidden="true"></span></summary>
+                                <div class="advanced__body">
+                                    <p class="advanced__note">以下凭据供脚本的自动登录使用。手动浏览器授权时，可以暂不填写。</p>
+                                    <label class="field">
+                                        <span class="field__label">微软账号密码 <i>可选</i></span>
+                                        <span class="field__control">
+                                            <svg class="field__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10.5V8a3.5 3.5 0 1 1 7 0v2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                                            <input id="f-password" name="password" type="password" spellcheck="false" placeholder="输入微软账号密码" />
+                                            <button class="ghost-btn" type="button" data-reveal="f-password">显示</button>
+                                        </span>
+                                    </label>
+                                    <label class="field">
+                                        <span class="field__label">TOTP 密钥 <i>可选</i></span>
+                                        <span class="field__control field__control--mono">
+                                            <svg class="field__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.8V12l2.8 1.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                                            <input id="f-totp" name="totpSecret" type="text" spellcheck="false" placeholder="开启验证器登录时填写" />
+                                        </span>
+                                    </label>
+                                    <label class="field">
+                                        <span class="field__label">备用邮箱 <i>恢复验证用</i></span>
+                                        <span class="field__control"><input id="f-recovery" name="recoveryEmail" type="email" spellcheck="false" placeholder="recovery@example.com" /></span>
+                                    </label>
+                                    <div class="field-row">
+                                        <label class="field">
+                                            <span class="field__label">代理地址</span>
+                                            <span class="field__control field__control--mono"><input id="f-proxy-url" name="proxyUrl" type="text" spellcheck="false" placeholder="http://127.0.0.1" /></span>
+                                        </label>
+                                        <label class="field field--narrow">
+                                            <span class="field__label">端口</span>
+                                            <span class="field__control field__control--mono"><input id="f-proxy-port" name="proxyPort" type="number" min="1" max="65535" placeholder="7890" /></span>
+                                        </label>
+                                    </div>
+                                    <div class="field-row">
+                                        <label class="field">
+                                            <span class="field__label">代理用户名</span>
+                                            <span class="field__control"><input id="f-proxy-user" name="proxyUsername" type="text" spellcheck="false" /></span>
+                                        </label>
+                                        <label class="field">
+                                            <span class="field__label">代理密码</span>
+                                            <span class="field__control"><input id="f-proxy-pass" name="proxyPassword" type="password" spellcheck="false" /></span>
+                                        </label>
+                                    </div>
+                                    <div class="field-row">
+                                        <label class="check-row">
+                                            <input type="checkbox" id="f-fp-mobile" checked />
+                                            <span>保存移动端指纹</span>
+                                        </label>
+                                        <label class="check-row">
+                                            <input type="checkbox" id="f-fp-desktop" checked />
+                                            <span>保存桌面端指纹</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <p class="form-error" id="form-error" role="alert" hidden></p>
+
+                            <div class="form-actions">
+                                <button class="liquid-btn liquid-btn--solid" type="submit" id="btn-save">
+                                    <span class="liquid-btn__text">保存账号</span>
+                                </button>
+                                <button class="ghost-btn ghost-btn--bordered" type="button" id="btn-reset">清空</button>
+                            </div>
+
+                            <p class="form-note">
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8.5v5m0 3.2v.1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                                <span>账号信息保存在本机，修改前会自动备份。</span>
+                            </p>
+                        </form>
+                    </section>
+                    </div>
+                </div>
+
+                <div class="panel-single" id="panel-logs" hidden>
+                    <section class="card card--logs">
+                        <div class="card__head">
+                            <div>
+                                <h2>运行日志</h2>
+                                <p class="muted" id="logs-hint">等待连接…</p>
+                            </div>
+                            <div class="card__head-actions">
+                                <div class="seg" id="log-filter">
+                                    <button class="seg__item is-active" data-level="all">全部</button>
+                                    <button class="seg__item" data-level="info">信息</button>
+                                    <button class="seg__item" data-level="warn">警告</button>
+                                    <button class="seg__item" data-level="error">错误</button>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="log-autoscroll" checked />
+                                    <span class="switch__track"><span class="switch__thumb"></span></span>
+                                    <span class="switch__label">跟随</span>
+                                </label>
+                                <button class="ghost-btn ghost-btn--bordered" id="btn-clear-logs">清空</button>
+                            </div>
+                        </div>
+                        <div class="log-view" id="log-view" role="log" aria-live="polite"></div>
+                    </section>
+                </div>
+
+                <div class="panel-single" id="panel-settings" hidden>
+                    <section class="card">
+                        <div class="card__head">
+                            <div>
+                                <h2>环境与设置</h2>
+                                <p class="muted">三类配置彼此独立：面板访问、微软账号授权、签到接口。</p>
+                            </div>
+                        </div>
+
+                        <div class="settings-grid">
+                            <div class="settings-col">
+                                <h3 class="settings-group">① 面板访问</h3>
+                                <label class="field">
+                                    <span class="field__label">修改访问密码</span>
+                                    <span class="field__control field__control--mono">
+                                        <input id="s-panel-token" type="password" spellcheck="false" placeholder="至少 8 位，回车保存；留空则不修改" />
+                                        <button class="ghost-btn" type="button" data-reveal="s-panel-token">显示</button>
+                                    </span>
+                                </label>
+                                <p class="settings-note" id="s-auth-note">—</p>
+
+                                <h3 class="settings-group">② 微软账号授权</h3>
+                                <label class="field">
+                                    <span class="field__label">脚本仓库根目录</span>
+                                    <span class="field__control field__control--mono"><input id="s-botdir" type="text" spellcheck="false" /></span>
+                                </label>
+                                <div class="form-actions">
+                                    <button class="ghost-btn ghost-btn--bordered" id="btn-recheck">重新自检</button>
+                                    <button class="ghost-btn ghost-btn--bordered" id="btn-save-bot">保存实例路径</button>
+                                </div>
+
+                                <h3 class="settings-group">③ 签到运行（可选）</h3>
+                                <label class="field">
+                                    <span class="field__label">Control API 地址</span>
+                                    <span class="field__control field__control--mono"><input id="s-control-api" type="text" spellcheck="false" placeholder="http://127.0.0.1:3010" /></span>
+                                </label>
+                                <label class="field">
+                                    <span class="field__label">Control API 令牌 <i>与面板密码无关</i></span>
+                                    <span class="field__control field__control--mono"><input id="s-control-token" type="password" spellcheck="false" /></span>
+                                </label>
+                                <div class="form-actions">
+                                    <button class="ghost-btn ghost-btn--bordered" id="btn-save-control">保存并测试</button>
+                                </div>
+                                <p class="settings-note" id="s-control-note">—</p>
+                            </div>
+
+                            <div class="settings-col">
+                                <h3 class="settings-group">环境自检</h3>
+                                <ul class="checklist checklist--compact" id="settings-checks"></ul>
+                                <pre class="code-block" id="cmd-hint"></pre>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </section>
+        </main>
+
+        <footer class="appfoot" id="appfoot" hidden>
+            <span class="appfoot__item">面板 v2 · 零依赖本地服务</span>
+            <span class="appfoot__dot" aria-hidden="true"></span>
+            <span class="appfoot__item" id="appfoot-path">—</span>
+            <span class="appfoot__links">
+                <a href="https://github.com/TheNetsky/Microsoft-Rewards-Script" target="_blank" rel="noreferrer">上游脚本 ↗</a>
+                <a href="https://github.com/linux-do/cdk" target="_blank" rel="noreferrer">界面参考 ↗</a>
+            </span>
+        </footer>
+
+        <!-- ── 授权弹窗 ─────────────────────────────────────── -->
+        <dialog class="dialog dialog--wide" id="dlg-login">
+            <div class="dialog__inner">
+                <header class="dialog__head">
+                    <div>
+                        <h3 id="dlg-login-title">微软账号授权</h3>
+                        <p class="muted" id="dlg-login-sub">将打开可见浏览器，请在窗口里完成微软登录。</p>
+                    </div>
+                    <button class="icon-btn" data-close-dialog aria-label="关闭">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </button>
+                </header>
+
+                <div class="dialog__body">
+                    <div class="radio-row" id="platform-picker" role="radiogroup" aria-label="授权平台">
+                        <label class="radio-chip is-active"><input type="radio" name="platform" value="mobile" checked /><span>移动端</span></label>
+                        <label class="radio-chip"><input type="radio" name="platform" value="desktop" /><span>桌面端</span></label>
+                        <label class="radio-chip"><input type="radio" name="platform" value="both" /><span>两端都授权</span></label>
+                    </div>
+
+                    <label class="check-row">
+                        <input type="checkbox" id="opt-fresh" />
+                        <span>忽略已保存的 Cookie，重新授权（--fresh）</span>
+                    </label>
+
+                    <div class="job-status" id="job-status" data-state="idle">
+                        <span class="job-status__dot"></span>
+                        <span class="job-status__text">等待开始</span>
+                        <span class="job-status__time mono-dim" id="job-time"></span>
+                    </div>
+                    <p class="job-hint" id="job-hint" hidden></p>
+                    <ul class="verify-list" id="verify-list" hidden></ul>
+
+                    <div class="log-view log-view--compact" id="job-log"></div>
+                </div>
+
+                <footer class="dialog__foot">
+                    <button class="ghost-btn ghost-btn--bordered" id="btn-stop-login" hidden>终止</button>
+                    <button class="liquid-btn liquid-btn--solid" id="btn-start-login"><span class="liquid-btn__text">启动浏览器授权</span></button>
+                </footer>
+            </div>
+        </dialog>
+
+        <!-- ── 条款 / 隐私 ───────────────────────────────────── -->
+        <dialog class="dialog" id="dlg-terms">
+            <div class="dialog__inner">
+                <header class="dialog__head">
+                    <h3>服务条款</h3>
+                    <button class="icon-btn" data-close-dialog aria-label="关闭"><svg viewBox="0 0 24 24" fill="none"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                </header>
+                <div class="dialog__body prose">
+                    <p>本控制台是 Microsoft-Rewards-Script 的本地图形前端，不提供任何托管服务，也不代持你的账号密码。</p>
+                    <ul>
+                        <li>你需要在有使用权的设备上运行它，并对自己的微软账号负责。</li>
+                        <li>自动化脚本可能违反微软服务条款，账号风险由使用者承担。</li>
+                        <li>面板会读写本机 <code>.env</code> 并启动浏览器进程，请勿暴露到局域网或公网。</li>
+                    </ul>
+                </div>
+            </div>
+        </dialog>
+
+        <dialog class="dialog" id="dlg-privacy">
+            <div class="dialog__inner">
+                <header class="dialog__head">
+                    <h3>隐私说明</h3>
+                    <button class="icon-btn" data-close-dialog aria-label="关闭"><svg viewBox="0 0 24 24" fill="none"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                </header>
+                <div class="dialog__body prose">
+                    <ul>
+                        <li>面板不向任何第三方服务器发送数据，请求只在本机 <code>127.0.0.1</code> 回环内完成。</li>
+                        <li>账号密码与 TOTP 密钥只写进实例目录的 <code>.env</code>（0600），这是上游脚本读取凭据的唯一来源。</li>
+                        <li>会话 Cookie 由微软签发，存在 <code>sessions.db</code>；面板只读元信息（数量与时间），从不读取 Cookie 内容。</li>
+                        <li>面板密码保存在本目录 <code>config.json</code>（0600），登录状态用 HttpOnly Cookie 维持。</li>
+                        <li>界面字体从 Google Fonts 加载；完全离线时可换成本地字体。</li>
+                    </ul>
+                </div>
+            </div>
+        </dialog>
+
+        <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+        <script type="module" src="/js/app.js"></script>
+    </body>
+</html>

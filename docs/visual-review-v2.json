@@ -1,0 +1,48 @@
+{
+  "desktop": {
+    "buttonHeight": 30,
+    "countryInput": {
+      "height": 44,
+      "right": 1020.609375,
+      "width": 211,
+      "x": 809.609375,
+      "y": 391.65625
+    },
+    "formSlot": "ACCOUNT_1",
+    "inputFontSizes": [
+      "13.5px",
+      "13.5px",
+      "12.5px",
+      "12.5px",
+      "12.5px"
+    ],
+    "languageInput": {
+      "height": 44,
+      "right": 1223.609375,
+      "width": 211,
+      "x": 1012.609375,
+      "y": 391.65625
+    },
+    "noteDisplay": "flex",
+    "overlapPx": 8,
+    "theme": "light",
+    "viewport": {
+      "height": 720,
+      "width": 1280
+    }
+  },
+  "mobile": {
+    "width": 390,
+    "height": 844,
+    "topbarHeight": 177.375,
+    "addAccountY": 967.296875,
+    "buttonHeight": 30,
+    "overflow": false
+  },
+  "gradientWhiteTextContrast": {
+    "purple": 4.2,
+    "blue": 3.02,
+    "cyan": 2.34,
+    "method": "Calculated from declared OKLCH stops, clipped to sRGB; not a full screenshot pixel audit"
+  }
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "addAccountInFirstScreen": true,
+    "buttonHeight": 44,
+    "height": 844,
+    "inputFont": "16px",
+    "inputsOverlap": false,
+    "overflow": false,
+    "theme": "light",
+    "width": 320
+  },
+  {
+    "addAccountInFirstScreen": true,
+    "buttonHeight": 44,
+    "height": 844,
+    "inputFont": "16px",
+    "inputsOverlap": false,
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "addAccountInFirstScreen": true,
+    "buttonHeight": 36,
+    "height": 900,
+    "inputFont": "14px",
+    "inputsOverlap": false,
+    "overflow": false,
+    "theme": "light",
+    "width": 768
+  },
+  {
+    "addAccountInFirstScreen": true,
+    "buttonHeight": 36,
+    "height": 900,
+    "inputFont": "14px",
+    "inputsOverlap": false,
+    "overflow": false,
+    "theme": "light",
+    "width": 1280
+  }
+]

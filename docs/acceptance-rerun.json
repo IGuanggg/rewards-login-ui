@@ -1,0 +1,324 @@
+{
+  "date": "2026-10-22",
+  "sandbox": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T",
+  "total": 27,
+  "passed": 27,
+  "failed": 0,
+  "results": [
+    {
+      "id": "auth_required",
+      "status": "PASS",
+      "expected": "未认证请求一律 401",
+      "actual": {
+        "accounts": 401,
+        "config": 401,
+        "sse": 401
+      }
+    },
+    {
+      "id": "auth_wrong_password",
+      "status": "PASS",
+      "expected": "错误密码 401",
+      "actual": {
+        "http": 401
+      }
+    },
+    {
+      "id": "auth_config_overwrite",
+      "status": "PASS",
+      "expected": "未认证无法改动配置",
+      "actual": {
+        "http": 401,
+        "changed": false
+      }
+    },
+    {
+      "id": "reject_non_repository_directory",
+      "status": "PASS",
+      "expected": "普通文件夹 422 且不创建文件",
+      "actual": {
+        "http": 422,
+        "envCreated": false
+      }
+    },
+    {
+      "id": "accept_valid_repository",
+      "status": "PASS",
+      "expected": "合法仓库 200",
+      "actual": {
+        "http": 200
+      }
+    },
+    {
+      "id": "reject_newlines_in_credentials",
+      "status": "PASS",
+      "expected": "含换行密码 422 且无注入行",
+      "actual": {
+        "http": 422,
+        "injected": false
+      }
+    },
+    {
+      "id": "roundtrip_special_characters",
+      "status": "PASS",
+      "expected": "特殊字符原样往返",
+      "actual": {
+        "http": 201,
+        "parsed": "p@ss w=rd \"#1\"",
+        "expected": "p@ss w=rd \"#1\""
+      }
+    },
+    {
+      "id": "preserve_fingerprint_settings",
+      "status": "PASS",
+      "expected": "编辑后移动端指纹仍为 false",
+      "actual": {
+        "http": 200,
+        "line": "ACCOUNT_5_SAVE_FINGERPRINT_MOBILE=false"
+      }
+    },
+    {
+      "id": "invalid_email_validation",
+      "status": "PASS",
+      "expected": "非法邮箱 422",
+      "actual": {
+        "http": 422
+      }
+    },
+    {
+      "id": "duplicate_email_validation",
+      "status": "PASS",
+      "expected": "重复邮箱 409",
+      "actual": {
+        "http": 409
+      }
+    },
+    {
+      "id": "env_backup",
+      "status": "PASS",
+      "expected": "写入前生成 .env.panel.bak",
+      "actual": {
+        "backupExists": true
+      }
+    },
+    {
+      "id": "custom_session_path",
+      "status": "PASS",
+      "expected": "读取 custom_sessions/sessions.db",
+      "actual": {
+        "exists": true,
+        "configured": "custom_sessions",
+        "mobile": {
+          "updatedAt": 1792678840016,
+          "cookies": 0
+        }
+      }
+    },
+    {
+      "id": "require_saved_session_for_success",
+      "status": "PASS",
+      "expected": "未写会话 → failed，即使退出码 0",
+      "actual": {
+        "http": 202,
+        "state": "failed",
+        "exitCode": 0
+      }
+    },
+    {
+      "id": "success_requires_saved_session",
+      "status": "PASS",
+      "expected": "写入会话 → done 且标记 mobile",
+      "actual": {
+        "state": "done",
+        "verification": {
+          "checked": true,
+          "saved": [
+            "mobile"
+          ],
+          "missing": [],
+          "details": [
+            {
+              "platform": "mobile",
+              "fresh": true,
+              "updatedAt": 1792678840494,
+              "previous": 1792678840016,
+              "cookies": 2,
+              "reason": null
+            }
+          ],
+          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\bot\\custom_sessions\\sessions.db",
+          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\bot\\custom_sessions\\sessions.db",
+          "error": null
+        }
+      }
+    },
+    {
+      "id": "both_platform_partial_detection",
+      "status": "PASS",
+      "expected": "both 只存一端 → partial",
+      "actual": {
+        "state": "partial",
+        "verification": {
+          "checked": true,
+          "saved": [
+            "mobile"
+          ],
+          "missing": [
+            "desktop"
+          ],
+          "details": [
+            {
+              "platform": "mobile",
+              "fresh": true,
+              "updatedAt": 1792678840740,
+              "previous": 1792678840494,
+              "cookies": 1,
+              "reason": null
+            },
+            {
+              "platform": "desktop",
+              "fresh": false,
+              "updatedAt": null,
+              "previous": null,
+              "cookies": null,
+              "reason": null
+            }
+          ],
+          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\bot\\custom_sessions\\sessions.db",
+          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\bot\\custom_sessions\\sessions.db",
+          "error": null
+        }
+      }
+    },
+    {
+      "id": "cancel_marks_job_cancelled",
+      "status": "PASS",
+      "expected": "终止 → cancelled",
+      "actual": {
+        "state": "cancelled"
+      }
+    },
+    {
+      "id": "nonzero_exit_failed",
+      "status": "PASS",
+      "expected": "退出码 1 → failed",
+      "actual": {
+        "state": "failed",
+        "exitCode": 1
+      }
+    },
+    {
+      "id": "control_health_401",
+      "status": "PASS",
+      "expected": "401 → unauthorized 而非 online",
+      "actual": {
+        "control": {
+          "status": "unauthorized",
+          "base": "http://127.0.0.1:18010",
+          "http": 401,
+          "detail": "Control API 令牌无效或未配置"
+        }
+      }
+    },
+    {
+      "id": "control_health_ok",
+      "status": "PASS",
+      "expected": "200 → online 且 /start 透传 202",
+      "actual": {
+        "control": "online",
+        "start": 202
+      }
+    },
+    {
+      "id": "control_unconfigured",
+      "status": "PASS",
+      "expected": "未配置 → 503 并说明",
+      "actual": {
+        "http": 503,
+        "error": "未配置 Control API，无法执行签到任务"
+      }
+    },
+    {
+      "id": "logout_invalidates_session",
+      "status": "PASS",
+      "expected": "退出后旧 Cookie 401",
+      "actual": {
+        "http": 401
+      }
+    },
+    {
+      "id": "session_survives_panel_restart",
+      "status": "PASS",
+      "expected": "重启面板后会话仍在且时间戳一致",
+      "actual": {
+        "before": 1792678840740,
+        "after": 1792678840740
+      }
+    },
+    {
+      "id": "relogin_refreshes_session",
+      "status": "PASS",
+      "expected": "再次授权刷新 updated_at",
+      "actual": {
+        "state": "done",
+        "before": 1792678840740,
+        "after": 1792678844409
+      }
+    },
+    {
+      "id": "short_password_survives_restart",
+      "status": "PASS",
+      "expected": "8 位密码保存、重启、再登录都成功，且不会被换成新密码",
+      "actual": {
+        "save": 200,
+        "stored": "abcd1234",
+        "afterRestart": "abcd1234",
+        "login": 200,
+        "accounts": 200
+      }
+    },
+    {
+      "id": "revoked_cookie_stays_dead_after_restart",
+      "status": "PASS",
+      "expected": "退出后旧 Cookie 在重启前后都是 401，未登录也不能代他人退出",
+      "actual": {
+        "logout": 200,
+        "afterLogout": 401,
+        "afterRestart": 401,
+        "anonymousLogout": 401
+      }
+    },
+    {
+      "id": "empty_or_broken_session_is_not_success",
+      "status": "PASS",
+      "expected": "空 Cookie 和无法解析的会话都判失败",
+      "actual": [
+        {
+          "kind": "empty",
+          "state": "failed"
+        },
+        {
+          "kind": "broken",
+          "state": "failed"
+        }
+      ]
+    },
+    {
+      "id": "preflight_uses_requested_path_and_requires_sessionpath",
+      "status": "PASS",
+      "expected": "检查 B 时返回 B，且缺少 sessionPath 不算授权就绪",
+      "actual": {
+        "botDir": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\other-bot",
+        "authorizeReady": false,
+        "config": {
+          "id": "config",
+          "label": "授权配置",
+          "ok": false,
+          "detail": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\other-bot\\config.json 缺少 sessionPath，手动授权会直接退出。请从 config.example.json 复制一份并填写 sessionPath",
+          "fatal": true,
+          "scope": "authorize"
+        }
+      }
+    }
+  ]
+}

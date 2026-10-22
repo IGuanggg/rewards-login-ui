@@ -1,0 +1,16 @@
+{
+    "name": "rewards-login-ui",
+    "version": "2.0.0",
+    "private": true,
+    "description": "Microsoft-Rewards-Script 本地登录控制台（零依赖，单页 UI）",
+    "type": "module",
+    "engines": {
+        "node": ">=22.5.0"
+    },
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node --watch server.js",
+        "test": "node tools/acceptance.mjs",
+        "shots": "node tools/ui-shots.mjs"
+    }
+}

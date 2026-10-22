@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-22",
+  "scope": "Independent boundary checks on isolated synthetic fixture; no real Microsoft login",
+  "results": [
+    {
+      "id": "password_8_chars_survives_restart",
+      "status": "FAIL",
+      "actual": {
+        "acceptedBeforeRestart": true,
+        "loginAfterRestart": 401,
+        "storedTokenReplaced": true
+      }
+    },
+    {
+      "id": "logout_remains_revoked_after_restart",
+      "status": "FAIL",
+      "actual": {
+        "beforeRestartBlocked": true,
+        "oldCookieAfterRestart": 200
+      }
+    },
+    {
+      "id": "missing_config_is_blocking",
+      "status": "FAIL",
+      "actual": {
+        "ready": true,
+        "config": {
+          "id": "config",
+          "label": "config.json",
+          "ok": false,
+          "detail": "未找到（首次运行会自动生成）",
+          "fatal": false,
+          "warn": true
+        }
+      }
+    },
+    {
+      "id": "empty_headless_shell_not_full_chromium",
+      "status": "FAIL",
+      "actual": {
+        "chromium": {
+          "id": "chromium",
+          "label": "Chromium 内核",
+          "ok": true,
+          "detail": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\rewards-v2-independent-G1KmhR\\browser-cache\\chromium_headless_shell-9999",
+          "fatal": false
+        },
+        "note": "Isolated fake cache contains only an empty chromium_headless_shell directory; no executable was created."
+      }
+    },
+    {
+      "id": "missing_sessionPath_is_blocking",
+      "status": "FAIL",
+      "actual": {
+        "ready": true,
+        "config": {
+          "id": "config",
+          "label": "config.json",
+          "ok": true,
+          "detail": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\rewards-v2-independent-G1KmhR\\bot\\config.json",
+          "fatal": false,
+          "warn": true
+        }
+      }
+    },
+    {
+      "id": "preflight_checks_requested_directory",
+      "status": "FAIL",
+      "actual": {
+        "requestedDifferentDirectory": true,
+        "returnedCurrentDirectory": true,
+        "ready": true
+      }
+    },
+    {
+      "id": "reject_empty_cookie_session",
+      "status": "FAIL",
+      "actual": {
+        "state": "done",
+        "details": [
+          {
+            "platform": "mobile",
+            "fresh": true,
+            "updatedAt": 1792670864702,
+            "previous": null,
+            "cookies": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "reject_malformed_session_state",
+      "status": "FAIL",
+      "actual": {
+        "state": "done",
+        "details": [
+          {
+            "platform": "mobile",
+            "fresh": true,
+            "updatedAt": 1792670865313,
+            "previous": 1792670864702,
+            "cookies": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "unauthenticated_logout_does_not_revoke_others",
+      "status": "FAIL",
+      "actual": {
+        "unauthenticatedLogout": 200,
+        "validSessionAfter": 401
+      }
+    }
+  ]
+}

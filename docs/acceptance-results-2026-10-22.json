@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-22",
+  "scope": "Isolated copy, dummy accounts only. No real Microsoft authentication or sign-in tasks executed.",
+  "results": [
+    {
+      "id": "auth_read_without_token",
+      "status": "FAIL",
+      "expected": "Configured panel token blocks unauthenticated account reads",
+      "actual": {
+        "http": 200,
+        "accounts": 1
+      }
+    },
+    {
+      "id": "custom_session_path",
+      "status": "FAIL",
+      "expected": "Read sessions from upstream config.sessionPath",
+      "actual": {
+        "exists": false,
+        "count": 0
+      }
+    },
+    {
+      "id": "control_health_401",
+      "status": "OBSERVED",
+      "expected": "A rejected Control API health response must not count as online",
+      "actual": {
+        "reachable": true,
+        "status": 401
+      }
+    },
+    {
+      "id": "auth_config_overwrite",
+      "status": "FAIL",
+      "expected": "Unauthenticated requests cannot overwrite token",
+      "actual": {
+        "http": 200,
+        "overwritten": true
+      }
+    },
+    {
+      "id": "reject_non_repository_directory",
+      "status": "FAIL",
+      "expected": "Reject directory lacking upstream script and package",
+      "actual": {
+        "http": 200,
+        "accepted": true
+      }
+    },
+    {
+      "id": "prevent_write_outside_repository",
+      "status": "FAIL",
+      "expected": "Do not create .env in an invalid repository",
+      "actual": {
+        "http": 201,
+        "envCreated": true
+      }
+    },
+    {
+      "id": "require_saved_session_for_success",
+      "status": "FAIL",
+      "expected": "A zero exit code without saving a session is not a successful login",
+      "actual": {
+        "state": "done",
+        "exitCode": 0,
+        "defaultSessionDbCreated": false
+      }
+    },
+    {
+      "id": "preserve_fingerprint_settings",
+      "status": "FAIL",
+      "expected": "Editing a region keeps existing fingerprint settings",
+      "actual": {
+        "http": 200,
+        "mobileFingerprintForcedOn": true
+      }
+    },
+    {
+      "id": "reject_newlines_in_credentials",
+      "status": "FAIL",
+      "expected": "Credential newline cannot inject a separate environment variable",
+      "actual": {
+        "http": 201,
+        "injected": true
+      }
+    },
+    {
+      "id": "invalid_email_validation",
+      "status": "PASS",
+      "expected": "Reject invalid email",
+      "actual": {
+        "http": 422
+      }
+    },
+    {
+      "id": "duplicate_email_validation",
+      "status": "PASS",
+      "expected": "Reject duplicate email",
+      "actual": {
+        "http": 409
+      }
+    },
+    {
+      "id": "env_backup",
+      "status": "PASS",
+      "expected": "Back up existing .env before editing",
+      "actual": {
+        "backupExists": true
+      }
+    }
+  ]
+}

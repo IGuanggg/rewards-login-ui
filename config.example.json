@@ -1,0 +1,6 @@
+{
+    "botDir": "D:\\Microsoft-Rewards-Script",
+    "controlApi": "http://127.0.0.1:3010",
+    "controlToken": "",
+    "panelToken": ""
+}
