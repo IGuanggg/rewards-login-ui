@@ -586,6 +586,7 @@ function openLoginDialog(account) {
     $('.job-status__text').textContent = '等待开始'
     $('#job-time').textContent = ''
     $('#job-hint').hidden = true
+    $('#remote-browser').hidden = true
     $('#verify-list').hidden = true
     $('#btn-stop-login').hidden = true
     $('#btn-start-login').disabled = false
@@ -626,6 +627,10 @@ function renderJob(job) {
     const statusEl = $('#job-status')
     const textEl = $('.job-status__text', statusEl)
     const hintEl = $('#job-hint')
+    const remote = $('#remote-browser')
+    remote.hidden = !job.desktopUrl || job.state !== 'running'
+    if (job.desktopUrl) $('#remote-browser-link').href = job.desktopUrl
+    else $('#remote-browser-link').removeAttribute('href')
     statusEl.dataset.state = job.state
 
     hintEl.hidden = !job.hint
@@ -715,7 +720,7 @@ async function handleStartLogin() {
         })
         renderJob(job)
         connectJobStream(state.jobEmail)
-        toast('info', '已启动浏览器，请在弹窗中完成微软登录')
+        toast('info', '授权已启动，请按日志提示完成微软登录')
     } catch (error) {
         if (error.status === 401) return showUnlock('会话已过期，请重新输入访问密码')
         toast('error', error.message)

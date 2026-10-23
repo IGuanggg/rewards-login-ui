@@ -1,0 +1,30 @@
+services:
+  rewards:
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${PANEL_BIND:-127.0.0.1}:${PANEL_PORT:-4173}:4173"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      PANEL_TOKEN: ${PANEL_TOKEN:-}
+      LOGIN_TIMEOUT_MINUTES: "15"
+      # Optional daily run in TZ. Empty means start tasks from the panel.
+      RUN_AT: ${RUN_AT:-}
+    volumes:
+      - ./data:/data
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    cpus: 1.5
+    shm_size: 256m
+    stop_grace_period: 25s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/api/auth/state').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s

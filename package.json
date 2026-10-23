@@ -11,6 +11,7 @@
         "start": "node server.js",
         "dev": "node --watch server.js",
         "test": "node tools/acceptance.mjs",
+        "test:docker": "node --test tools/docker.test.mjs",
         "shots": "node tools/ui-shots.mjs"
     }
 }

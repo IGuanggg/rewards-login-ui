@@ -20,6 +20,7 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { randomBytes, createHmac, timingSafeEqual, createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
+import { createDesktopProxy } from './lib/desktop-proxy.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, 'public')
@@ -29,6 +30,7 @@ const CONFIG_FILE = process.env.PANEL_CONFIG ? path.resolve(process.env.PANEL_CO
 const HOST = process.env.PANEL_HOST || '127.0.0.1'
 const PORT = Number(process.env.PANEL_PORT || 4173)
 const AUTH_DISABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.PANEL_NO_AUTH || '').toLowerCase())
+const REMOTE_DESKTOP = process.env.PANEL_REMOTE_DESKTOP === '1'
 
 const SESSION_COOKIE = 'panel_session'
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
@@ -934,6 +936,25 @@ function buildAccountsPayload(botDir) {
 /* ────────────────────────── 手动登录任务 ────────────────────────── */
 
 const jobs = new Map()
+const desktopProxy = createDesktopProxy({
+    authenticated: isAuthenticated,
+    active: () => REMOTE_DESKTOP && [...jobs.values()].some(job => job.state === 'running' && job.desktopReady)
+})
+let browserStartPending = false
+
+async function guardedBrowserStart(action) {
+    if (!REMOTE_DESKTOP) return action()
+    if (browserStartPending || [...jobs.values()].some(job => job.state === 'running')) {
+        throw Object.assign(new Error('已有授权或签到任务，请等待完成后再启动。'), { status: 409 })
+    }
+    browserStartPending = true
+    try {
+        const control = await probeControlApi()
+        if (control.status !== 'online') throw Object.assign(new Error('容器内签到服务尚未就绪，请稍后重试。'), { status: 503 })
+        if (control.remoteState !== 'idle') throw Object.assign(new Error('签到任务正在运行，请先停止或等待结束再授权。'), { status: 409 })
+        return await action()
+    } finally { browserStartPending = false }
+}
 
 function jobView(job) {
     if (!job) return null
@@ -946,6 +967,8 @@ function jobView(job) {
         endedAt: job.endedAt,
         exitCode: job.exitCode,
         hint: job.hint || null,
+        desktopUrl: REMOTE_DESKTOP && job.state === 'running' && job.desktopReady
+            ? '/desktop/vnc.html?autoconnect=1&resize=scale&path=desktop/websockify' : null,
         verification: job.verification || null,
         log: job.log.slice(-MAX_JOB_LOG)
     }
@@ -1048,14 +1071,17 @@ function startManualLogin({ botDir, email, platform, fresh }) {
     }
     jobs.set(key, job)
 
-    const args = [script, '--email', email, '--platform', platform]
+    const args = REMOTE_DESKTOP
+        ? ['--nonblock', '--no-fork', '--conflict-exit-code', '75', '/tmp/rewards-browser.lock', process.execPath,
+            path.join(__dirname, 'docker', 'worker.mjs'), 'login', '--email', email, '--platform', platform]
+        : [script, '--email', email, '--platform', platform]
     if (fresh) args.push('--fresh')
 
     log('启动手动登录 →', email, platform, fresh ? '(fresh)' : '')
 
     let child
     try {
-        child = spawn(process.execPath, args, {
+        child = spawn(REMOTE_DESKTOP ? '/usr/bin/flock' : process.execPath, args, {
             cwd: botDir,
             env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -1071,6 +1097,10 @@ function startManualLogin({ botDir, email, platform, fresh }) {
     job.child = child
 
     const push = chunk => {
+        if (REMOTE_DESKTOP) {
+            job.outputTail = ((job.outputTail || '') + chunk.toString('utf8')).slice(-2048)
+            if (job.outputTail.includes('__PANEL_DESKTOP_READY__')) job.desktopReady = true
+        }
         for (const rawLine of chunk.toString('utf8').split(/\r?\n/)) {
             const line = rawLine.replace(/\u001b\[[0-9;]*m/g, '').trimEnd()
             if (!line) continue
@@ -1091,6 +1121,7 @@ function startManualLogin({ botDir, email, platform, fresh }) {
     })
 
     child.on('exit', (code, signal) => {
+        if (REMOTE_DESKTOP) desktopProxy.close()
         job.exitCode = code
         job.endedAt = Date.now()
         job.child = null
@@ -1107,7 +1138,9 @@ function startManualLogin({ botDir, email, platform, fresh }) {
             job.hint = '任务被终止，未写入新的会话。'
         } else if (!exitedCleanly) {
             job.state = 'failed'
-            job.hint = `进程异常退出（退出码 ${code ?? '—'}），本次授权无效。`
+            job.hint = code === 75 ? '已有授权或签到任务占用浏览器，请等待完成后重试。'
+                : code === 124 ? '授权超时，远程浏览器已关闭。请重新启动授权。'
+                : `进程异常退出（退出码 ${code ?? '—'}），本次授权无效。`
         } else if (!saved.length) {
             job.state = 'failed'
             job.hint = diagnoseFailure(joined, job.verification)
@@ -1282,6 +1315,10 @@ const server = http.createServer(async (req, res) => {
     const ip = req.socket.remoteAddress || 'local'
 
     try {
+        if (pathname === '/desktop' || pathname.startsWith('/desktop/')) {
+            if (!REMOTE_DESKTOP) return json(res, 404, { error: '当前运行方式未启用远程浏览器' })
+            return desktopProxy.handle(req, res, url)
+        }
         /* ── 鉴权网关 ── */
         if (pathname.startsWith('/api/') && !PUBLIC_ROUTES.has(pathname)) {
             if (!isAuthenticated(req)) {
@@ -1331,6 +1368,7 @@ const server = http.createServer(async (req, res) => {
                 return json(res, 401, { error: '未登录，无需退出', code: 'UNAUTHORIZED' })
             }
             sessionSecret = randomBytes(32)
+            desktopProxy.close()
             for (const client of sseClients) {
                 try {
                     client.res.end()
@@ -1532,7 +1570,7 @@ const server = http.createServer(async (req, res) => {
             if (!EMAIL_RE.test(email)) return json(res, 422, { error: '邮箱格式不正确' })
             const platform = ['mobile', 'desktop', 'both'].includes(body.platform) ? body.platform : 'mobile'
 
-            const result = startManualLogin({ botDir: dir, email, platform, fresh: Boolean(body.fresh) })
+            const result = await guardedBrowserStart(() => startManualLogin({ botDir: dir, email, platform, fresh: Boolean(body.fresh) }))
             if (!result.ok) return json(res, result.status || 400, { error: result.error })
             return json(res, 202, { ok: true, job: result.job })
         }
@@ -1555,7 +1593,7 @@ const server = http.createServer(async (req, res) => {
         /* ── Control API ── */
         if (pathname === '/api/control/start' && req.method === 'POST') {
             const body = await readBody(req)
-            const result = await callControlApi('POST', '/start', body.payload || {})
+            const result = await guardedBrowserStart(() => callControlApi('POST', '/start', body.payload || {}))
             return json(res, result.ok ? 202 : result.http || 503, result)
         }
 
@@ -1581,6 +1619,11 @@ const server = http.createServer(async (req, res) => {
         if (status >= 500) log('请求失败', req.method, pathname, error)
         return json(res, status, { error: error.message || '服务器错误', hint: error.hint, missing: error.missing })
     }
+})
+
+server.on('upgrade', (req, socket, head) => {
+    if (REMOTE_DESKTOP) return desktopProxy.upgrade(req, socket, head)
+    socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
 })
 
 /* ────────────────────────── 启动 ────────────────────────── */
@@ -1620,7 +1663,19 @@ server.on('error', error => {
     throw error
 })
 
-process.on('SIGINT', () => {
-    for (const job of jobs.values()) if (job.child) job.child.kill()
-    process.exit(0)
+let shuttingDown = false
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
+    if (shuttingDown) return
+    shuttingDown = true
+    desktopProxy.close()
+    for (const client of sseClients) client.res.end()
+    for (const job of jobs.values()) if (job.child) { job.cancelled = true; job.child.kill() }
+    server.close()
+    const deadline = Date.now() + 8000
+    const timer = setInterval(() => {
+        if (![...jobs.values()].some(job => job.child) || Date.now() > deadline) {
+            clearInterval(timer)
+            process.exit(0)
+        }
+    }, 100)
 })

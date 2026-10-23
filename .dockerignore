@@ -1,0 +1,12 @@
+.git
+node_modules
+data
+docs
+tools
+config.json
+.env
+.env.*
+*.log
+**/*.panel.bak
+**/sessions
+**/sessions.db*

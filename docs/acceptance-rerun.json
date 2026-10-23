@@ -1,6 +1,6 @@
 {
-  "date": "2026-10-22",
-  "sandbox": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T",
+  "date": "2026-10-23",
+  "sandbox": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-6d22HL",
   "total": 27,
   "passed": 27,
   "failed": 0,
@@ -109,7 +109,7 @@
         "exists": true,
         "configured": "custom_sessions",
         "mobile": {
-          "updatedAt": 1792678840016,
+          "updatedAt": 1792722126406,
           "cookies": 0
         }
       }
@@ -140,14 +140,14 @@
             {
               "platform": "mobile",
               "fresh": true,
-              "updatedAt": 1792678840494,
-              "previous": 1792678840016,
+              "updatedAt": 1792722126891,
+              "previous": 1792722126406,
               "cookies": 2,
               "reason": null
             }
           ],
-          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\bot\\custom_sessions\\sessions.db",
-          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\bot\\custom_sessions\\sessions.db",
+          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-6d22HL\\bot\\custom_sessions\\sessions.db",
+          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-6d22HL\\bot\\custom_sessions\\sessions.db",
           "error": null
         }
       }
@@ -170,8 +170,8 @@
             {
               "platform": "mobile",
               "fresh": true,
-              "updatedAt": 1792678840740,
-              "previous": 1792678840494,
+              "updatedAt": 1792722127154,
+              "previous": 1792722126891,
               "cookies": 1,
               "reason": null
             },
@@ -184,8 +184,8 @@
               "reason": null
             }
           ],
-          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\bot\\custom_sessions\\sessions.db",
-          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\bot\\custom_sessions\\sessions.db",
+          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-6d22HL\\bot\\custom_sessions\\sessions.db",
+          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-6d22HL\\bot\\custom_sessions\\sessions.db",
           "error": null
         }
       }
@@ -251,8 +251,8 @@
       "status": "PASS",
       "expected": "重启面板后会话仍在且时间戳一致",
       "actual": {
-        "before": 1792678840740,
-        "after": 1792678840740
+        "before": 1792722127154,
+        "after": 1792722127154
       }
     },
     {
@@ -261,8 +261,8 @@
       "expected": "再次授权刷新 updated_at",
       "actual": {
         "state": "done",
-        "before": 1792678840740,
-        "after": 1792678844409
+        "before": 1792722127154,
+        "after": 1792722130778
       }
     },
     {
@@ -308,13 +308,13 @@
       "status": "PASS",
       "expected": "检查 B 时返回 B，且缺少 sessionPath 不算授权就绪",
       "actual": {
-        "botDir": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\other-bot",
+        "botDir": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-6d22HL\\other-bot",
         "authorizeReady": false,
         "config": {
           "id": "config",
           "label": "授权配置",
           "ok": false,
-          "detail": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-HbjG5T\\other-bot\\config.json 缺少 sessionPath，手动授权会直接退出。请从 config.example.json 复制一份并填写 sessionPath",
+          "detail": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-6d22HL\\other-bot\\config.json 缺少 sessionPath，手动授权会直接退出。请从 config.example.json 复制一份并填写 sessionPath",
           "fatal": true,
           "scope": "authorize"
         }

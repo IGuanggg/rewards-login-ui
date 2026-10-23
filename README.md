@@ -4,6 +4,8 @@
 
 界面风格参考 [linux-do/cdk](https://github.com/linux-do/cdk)（居中单列入口、液态按钮、极细描边、弹窗式交互），零构建、零依赖，只用 Node.js 内置模块。
 
+**无桌面服务器 / Docker：** 已提供完整 Chromium 和按需远程授权方案，详见 [Docker 部署说明](docs/Docker部署.md)。在此目录执行 `docker compose up -d --build`，授权时从面板打开远程浏览器；默认内存上限 1.5 GiB。
+
 ![解锁页](docs/shots/unlock.png)
 
 ---

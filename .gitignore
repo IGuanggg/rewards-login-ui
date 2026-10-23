@@ -27,3 +27,6 @@ Thumbs.db
 
 # 旧设计备份（仅本地留存）
 docs/design-backup-*/
+
+# Docker persistent credentials and sessions
+data/
