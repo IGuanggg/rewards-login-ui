@@ -1,6 +1,6 @@
 export function trendSvg(trend) {
     const values = trend.filter(point => point.points != null)
-    if (!values.length) return '<div class="dashboard-chart-empty"><strong>暂无积分记录</strong><p>完成一次签到后显示趋势。</p></div>'
+    if (!values.length) return '<div class="dashboard-chart-empty"><span class="chart-empty-mark" aria-hidden="true">↗</span><strong>你的积分趋势，即将在这里出现</strong><p>完成第一轮签到后，展示最近 14 天的确认积分。</p></div>'
     const max = Math.max(10, ...values.map(point => point.points)), min = Math.min(0, ...values.map(point => point.points))
     const y = value => 165 - (value - min) / (max - min) * 135
     const x = i => 40 + i * 590 / Math.max(1, trend.length - 1)
@@ -27,23 +27,24 @@ export function createDashboard({ api, escapeHtml: esc, onUnauthorized }) {
             const data = await api('/api/dashboard')
             if (!active || generation !== version) return
             const saved = data.accounts.filter(account => account.savedSession).length
-            $('#dash-attention-metric').dataset.tone = data.attention ? 'attention' : 'neutral'
+            $('#dash-attention').closest('.stat-card').dataset.color = data.attention ? 'red' : 'neutral'
             const balances = data.accounts.filter(account => account.balance != null)
             for (const [id, value] of Object.entries({ 'dash-accounts': data.accounts.length, 'dash-sessions': saved,
                 'dash-points': data.todayPoints ?? '—', 'dash-balance': balances.length ? balances.reduce((n, a) => n + a.balance, 0) : '—', 'dash-attention': data.attention,
-                'dash-updated': `${data.today} · 更新于 ${new Date().toLocaleTimeString('zh-CN', { hour12: false, timeZone: data.timezone })}`,
+                'dash-updated': `已更新 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })} · ${data.timezone}`,
                 'dash-source': modes[data.queryMode] || '当前来源',
                 'dash-next': data.schedule.enabled && data.schedule.supported ? fmtTime(data.schedule.nextAt) : '未开启，需手动运行',
                 'dash-schedule-last': data.schedule.last ? `${data.schedule.last.day} ${data.schedule.last.reason}` : '尚无定时触发记录',
                 'dash-version': `面板 ${data.panelVersion} / 内核 ${data.upstreamVersion || '未连接'}`,
-                'dash-balance-note': `${balances.length}/${data.accounts.length} 个账号已上报余额` })) $(`#${id}`).textContent = value
+                'dash-balance-note': `${balances.length}/${data.accounts.length} 个账号有已确认余额`,
+                'dash-session-note': '已保存会话，实际有效性以登录结果为准' })) $(`#${id}`).textContent = value
             $('#dash-trend').innerHTML = trendSvg(data.trend)
             $('#dash-trend-table').innerHTML = data.trend.map(day => `<tr><td>${day.day}</td><td>${day.points ?? '未记录'}</td><td>${day.runs}</td></tr>`).join('')
             $('#dash-account-body').innerHTML = data.accounts.length ? data.accounts.map(account => `<tr><td>${esc(account.email)}</td><td>${account.savedSession ? '已保存' : '待登录'}</td><td>${account.todayPoints ?? '待确认'}</td><td>${account.balance ?? '待确认'}</td><td>${fmtTime(account.balanceAt)}</td></tr>`).join('') : '<tr><td colspan="5" class="muted">还没有账号，请到账号页添加并登录。</td></tr>'
             $('#dash-error').hidden = true
         } catch (error) {
             if (error.status === 401) { stop(); onUnauthorized(); return }
-            if (active) { $('#dash-error').textContent = `更新失败：${error.message}。仍显示上次数据，可稍后重试。`; $('#dash-error').hidden = false }
+            if (active) { $('#dash-error').textContent = `更新失败：${error.message}`; $('#dash-error').hidden = false }
         } finally { if (active && version === generation && !document.hidden) timer = setTimeout(refresh, 15000) }
     }
     function stop() { active = false; generation++; clearTimeout(timer) }

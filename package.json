@@ -15,8 +15,6 @@
         "test:activity": "node --test tools/activity.test.mjs tools/activity-api.test.mjs",
         "test:run": "node --test tools/run-console.test.mjs tools/run-api.test.mjs",
         "test:china": "node --test tools/china.test.mjs",
-        "shots": "node tools/ui-shots.mjs",
-        "test:ui": "node --test tools/dashboard-ui.test.mjs tools/run-console.test.mjs",
-        "preview:ui": "node tools/ui-preview.mjs"
+        "shots": "node tools/ui-shots.mjs"
     }
 }

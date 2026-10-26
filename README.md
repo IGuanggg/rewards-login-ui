@@ -2,7 +2,7 @@
 
 给 [TheNetsky/Microsoft-Rewards-Script](https://github.com/TheNetsky/Microsoft-Rewards-Script) 用的**本地签到与授权控制台**：在网页上添加账号 → 登录微软账号 → 一键运行签到，支持停止运行、任务记录和可视化设置。登录会话自动写回 `sessions.db`，之后签到时复用。
 
-界面使用黑白灰中性配色：首页突出确认积分、运行状态与待处理账号，桌面顶部导航、手机底部导航。零构建、零依赖，只用 Node.js 内置模块。
+界面风格参考 [linux-do/cdk](https://github.com/linux-do/cdk)（浅色中性底色、灰色圆角卡片、轻量描边、底部导航），零构建、零依赖，只用 Node.js 内置模块。
 
 **无桌面服务器 / Docker：** 已提供完整 Chromium 和按需远程授权方案，详见 [Docker 部署说明](docs/Docker部署.md)。在此目录执行 `docker compose up -d --build`，授权时从面板打开远程浏览器；默认内存上限 1.5 GiB。
 
@@ -12,9 +12,7 @@
 
 **签到记录：** Docker 模式下，点击「查看任务记录」或进入「任务记录」，可按日期查看每轮签到的任务、结果、积分及原始输出，保存最近 30 天。详见 [签到任务记录](docs/签到任务记录-2026-10-26.md)。
 
-![控制台新版预览（虚构数据）](docs/ui-refined-desktop.png)
-
-**界面调整（2026-10-26）：** 精简统计卡片与重复说明，账号积分先于历史趋势展示；保留原有数据口径、任务设置和授权流程。可用 `npm run preview:ui` 打开完全隔离的虚构数据预览，详见 [UI 调整说明](docs/UI调整-2026-10-26.md)。
+![国区控制台空状态预览](docs/china-dashboard-preview.jpg)
 
 ---
 
