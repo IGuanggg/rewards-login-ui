@@ -30,7 +30,7 @@ export function createNotifications({ api, onUnauthorized }) {
         try {
             data = await api('/api/notifications'); render()
             const last = data.last ? ` 上次发送${data.last.state === 'sent' ? '已被渠道接受' : '失败，请检查密钥和渠道配额'}（${new Date(data.last.at).toLocaleString('zh-CN')}）。` : ''
-            $('#notification-note').textContent = (!data.supported ? '当前为本地预览；Docker 面板支持运行结果通知。' : data.enabled ? '通知已开启，下次运行结束后生效。' : '通知尚未开启。') + last
+            $('#notification-note').textContent = (!data.supported ? '本地预览不支持通知。' : data.enabled ? '已开启。' : '') + last
         }
         catch (error) { if (error.status === 401) onUnauthorized(); else $('#notification-note').textContent = `读取失败：${error.message}` }
         finally { busy = false }
@@ -45,7 +45,7 @@ export function createNotifications({ api, onUnauthorized }) {
                 provider: $('#notification-provider').value, onlyProblems: $('#notification-onlyProblems').checked,
                 token: $('#notification-token').value, server: $('#notification-server').value,
                 clearToken: $('#notification-clear').checked } })
-            render(); $('#notification-note').textContent = '已保存。通知在下一轮签到结束后生效。'
+            render(); $('#notification-note').textContent = '已保存'
         } catch (error) { if (error.status === 401) onUnauthorized(); else $('#notification-note').textContent = `未保存：${error.message}` }
         finally { busy = false; $('#notification-save').disabled = false }
     })

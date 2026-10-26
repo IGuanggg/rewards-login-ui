@@ -44,7 +44,7 @@ export function createDashboard({ api, escapeHtml: esc, onUnauthorized }) {
             $('#dash-error').hidden = true
         } catch (error) {
             if (error.status === 401) { stop(); onUnauthorized(); return }
-            if (active) { $('#dash-error').textContent = `总览更新失败：${error.message}。显示的可能是上次数据，请重新刷新。`; $('#dash-error').hidden = false }
+            if (active) { $('#dash-error').textContent = `更新失败：${error.message}`; $('#dash-error').hidden = false }
         } finally { if (active && version === generation && !document.hidden) timer = setTimeout(refresh, 15000) }
     }
     function stop() { active = false; generation++; clearTimeout(timer) }

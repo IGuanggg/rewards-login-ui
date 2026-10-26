@@ -11,7 +11,7 @@ export function createActivityPanel({ api, escapeHtml: esc, timeOf, onUnauthoriz
     const statusTag = value => `<span class="tag ${tone(value)}">${esc(LABELS[value] || value)}</span>`
     const error = problem => {
         if (problem.status === 401) { stop(); onUnauthorized(); return }
-        $('#activity-note').textContent = `读取记录失败：${problem.message}。可点击刷新重试。`
+        $('#activity-note').textContent = `读取失败：${problem.message}`
     }
     function stop() {
         state.active = false

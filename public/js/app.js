@@ -361,7 +361,7 @@ async function refreshState() {
         note.dataset.tone = status === 'online' ? 'ok' : status === 'unconfigured' ? 'muted' : 'bad'
 
         $('#s-auth-note').textContent = info.authRequired
-            ? '面板已启用访问密码（HttpOnly Cookie 会话）；修改后需要重新登录。'
+            ? '已启用访问密码；修改后需重新登录。'
             : '⚠ 已用 PANEL_NO_AUTH 关闭鉴权，任何能访问本端口的人都能读写账号配置。'
         $('#s-auth-note').dataset.tone = info.authRequired ? 'muted' : 'bad'
 
