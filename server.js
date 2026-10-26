@@ -23,6 +23,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { createDesktopProxy } from './lib/desktop-proxy.mjs'
 import { ActivityStore, activityFile, redactLog } from './lib/activity-store.mjs'
 import { readTaskSettings, writeTaskSettings, readSchedule } from './lib/task-settings.mjs'
+import { notificationView, saveNotifications } from './lib/notifications.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, 'public')
@@ -1281,6 +1282,8 @@ async function controlStatus() {
     const upstream = result.ok ? result.data : {}
     const run = upstream.run || {}
     const latest = activity().latest()
+    const progress = latest ? activity().progress(latest.run.id) : null
+    const currentProgress = latest?.run.state === 'running' && (!upstream.startedAt || Math.abs(latest.run.startedAt - Date.parse(upstream.startedAt)) < 15000) ? progress : null
     const authorization = [...jobs.values()].find(job => job.state === 'running')
     const schedule = readSchedule(CONFIG_FILE)
     const safe = value => redactLog(value, [state.controlToken, state.panelToken])
@@ -1291,8 +1294,9 @@ async function controlStatus() {
         lastExit: upstream.lastExit ? { code: upstream.lastExit.code, signal: upstream.lastExit.signal, at: upstream.lastExit.at, error: upstream.lastExit.error ? safe(upstream.lastExit.error) : null } : null,
         run: { currentAccount: run.live?.currentAccount || null, collected: run.finished ? run.collected : null,
             accountsTotal: run.accountsTotal ?? null, accountsDone: (run.accounts || []).filter(account => account.success != null).length,
-            pendingDelay: run.pendingDelay || null },
+            pendingDelay: run.pendingDelay || currentProgress?.wait || null },
         latest,
+        progress,
         readiness: runReadiness(),
         authorization: authorization ? { email: authorization.email, desktopUrl: jobView(authorization).desktopUrl, startedAt: authorization.startedAt } : null,
         schedule: { ...schedule, enabled: REMOTE_DESKTOP && schedule.enabled, supported: REMOTE_DESKTOP }
@@ -1632,6 +1636,25 @@ const server = http.createServer(async (req, res) => {
         }
 
         /* ── 持久化签到记录 ── */
+        if (pathname === '/api/dashboard' && req.method === 'GET') {
+            const history = activity().overview()
+            const accounts = buildAccountsPayload(currentBotDir()).accounts || []
+            let config = {}, upstreamVersion = null
+            try { config = readTaskSettings(currentBotDir(), CONFIG_FILE); upstreamVersion = JSON.parse(fs.readFileSync(path.join(currentBotDir(), 'package.json'), 'utf8')).version || null } catch {}
+            const known = new Map(history.accounts.map(account => [account.email.toLowerCase(), account]))
+            const current = accounts.map(account => ({ email: account.email, savedSession: Boolean(account.sessions.mobile?.cookies || account.sessions.desktop?.cookies),
+                todayPoints: known.get(account.email.toLowerCase())?.todayPoints ?? null,
+                balance: known.get(account.email.toLowerCase())?.balance ?? null, balanceAt: known.get(account.email.toLowerCase())?.balanceAt ?? null }))
+            let scheduleState = null
+            try { scheduleState = JSON.parse(fs.readFileSync(path.join(path.dirname(CONFIG_FILE), 'schedule-state.json'), 'utf8')) } catch {}
+            return json(res, 200, { ...history, accounts: current, schedule: { ...readSchedule(CONFIG_FILE), supported: REMOTE_DESKTOP, last: scheduleState },
+                queryMode: config.queryMode || 'existing', chinaSupported: config.chinaSupported || false, panelVersion: '2.1.0', upstreamVersion })
+        }
+        if (pathname === '/api/notifications' && req.method === 'GET') return json(res, 200, { ...notificationView(CONFIG_FILE), supported: REMOTE_DESKTOP })
+        if (pathname === '/api/notifications' && req.method === 'PUT') {
+            if (!REMOTE_DESKTOP) return json(res, 422, { error: '结果通知目前由 Docker 工作进程发送，请在 Docker 面板中设置。' })
+            return json(res, 200, { ...saveNotifications(CONFIG_FILE, await readBody(req)), supported: true })
+        }
         if (pathname === '/api/activity' && req.method === 'GET') {
             return json(res, 200, activity().day(url.searchParams.get('day') || undefined))
         }

@@ -1,6 +1,6 @@
 {
     "name": "rewards-login-ui",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "private": true,
     "description": "Microsoft-Rewards-Script 本地登录控制台（零依赖，单页 UI）",
     "type": "module",
@@ -14,6 +14,7 @@
         "test:docker": "node --test tools/docker.test.mjs",
         "test:activity": "node --test tools/activity.test.mjs tools/activity-api.test.mjs",
         "test:run": "node --test tools/run-console.test.mjs tools/run-api.test.mjs",
+        "test:china": "node --test tools/china.test.mjs",
         "shots": "node tools/ui-shots.mjs"
     }
 }

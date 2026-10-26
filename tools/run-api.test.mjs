@@ -98,7 +98,7 @@ test('authenticated UI API starts selected accounts, reports real state and stop
     let ready = false
     for (let i = 0; i < 60; i++) { try { ready = (await fetch(base + '/api/auth/state')).ok } catch {} if (ready) break; await new Promise(resolve => setTimeout(resolve, 50)) }
     assert.ok(ready)
-    for (const route of ['/api/control/status', '/api/task-settings']) assert.equal((await fetch(base + route)).status, 401)
+    for (const route of ['/api/control/status', '/api/task-settings', '/api/dashboard', '/api/notifications']) assert.equal((await fetch(base + route)).status, 401)
     const login = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
     const cookie = login.headers.get('set-cookie').split(';')[0]
     const request = (route, body, method = 'POST') => fetch(base + route, { method: body ? method : 'GET', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
@@ -109,6 +109,13 @@ test('authenticated UI API starts selected accounts, reports real state and stop
     assert.equal((await request('/api/control/start', { payload: { accountIndex: 999 } })).status, 422)
     assert.equal(starts, 0)
     const settings = await (await request('/api/task-settings')).json()
+    const overview = await (await request('/api/dashboard')).json()
+    assert.equal(overview.accounts.length, 1)
+    assert.equal(overview.todayPoints, 0)
+    assert.equal(overview.accounts[0].balance, null)
+    const notice = await request('/api/notifications', { enabled: false, provider: 'pushplus', onlyProblems: true, token: 'synthetic-key' }, 'PUT')
+    assert.equal(notice.status, 200); assert.equal((await notice.json()).hasToken, true)
+    assert.equal(JSON.stringify(await (await request('/api/notifications')).json()).includes('synthetic-key'), false)
     const next = bodyFor(settings)
     assert.equal((await request('/api/task-settings', next, 'PUT')).status, 200)
     assert.equal((await request('/api/control/start', { payload: { accountIndex: 3 } })).status, 202)

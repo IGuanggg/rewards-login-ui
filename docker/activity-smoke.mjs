@@ -31,7 +31,8 @@ try {
         ['MAIN', 'ACCOUNT-END', 'Completed account: sample@example.invalid | pointsGained=18 | previousBalance=100 | currentBalance=118 | durationSeconds=10'],
         ['MAIN', 'RUN-END', 'Completed all accounts | accountsProcessed=1 | pointsGained=18 | previousBalance=100 | currentBalance=118 | runtimeMinutes=0.2']
     ].map(([platform, title, message]) => `[2026-10-26 12:00:00] [sample] [INFO] ${platform} [${title}] ${message}`).join('\n')
-    const emitter = `const b=Buffer.from(${JSON.stringify(lines)}); let i=0; const t=setInterval(()=>{process.stdout.write(b.subarray(i,i+7));i+=7;if(i>=b.length)clearInterval(t)},1)`
+    const withWait = '__PANEL_WAIT__' + JSON.stringify({ seconds: 60, sinceTs: Date.now() }) + '\n' + lines
+    const emitter = `const b=Buffer.from(${JSON.stringify(withWait)}); let i=0; const t=setInterval(()=>{process.stdout.write(b.subarray(i,i+7));i+=7;if(i>=b.length)clearInterval(t)},1)`
     const child = spawn(process.execPath, ['-e', emitter], { stdio: ['ignore', 'pipe', 'pipe'] })
     recorder.attach(child)
     const [code] = await once(child, 'close')
@@ -45,6 +46,7 @@ try {
     assert.equal(detail.tasks.length, 3)
     assert.equal(detail.tasks.find(task => task.category === 'READ-TO-EARN').points, 10)
     assert.ok(store.logs(day.runs[0].id).logs.some(log => log.message.includes('阅读记录验证')))
+    assert.ok(store.logs(day.runs[0].id).logs.some(log => log.title === 'PANEL-WAIT'))
     console.log('\nPASS durable activity journal, real upstream parser, task points, and split UTF-8 output')
     const fixture = path.join(dir, 'synthetic-bot')
     fs.mkdirSync(path.join(fixture, 'dist'), { recursive: true })

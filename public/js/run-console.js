@@ -1,5 +1,12 @@
 const ACTIVE = new Set(['starting', 'running', 'stopping'])
 const LABELS = { completed: '本轮已完成', partial: '本轮部分完成', failed: '本轮运行失败', cancelled: '本轮已停止', interrupted: '上次运行被中断' }
+export function waitMessage(delay, now = Date.now()) {
+    if (!delay || !Number.isFinite(delay.seconds)) return null
+    const since = typeof delay.sinceTs === 'number' ? delay.sinceTs : Date.parse(delay.sinceTs)
+    if (!Number.isFinite(since)) return '正在等待下一步，等待起点尚未上报'
+    const left = Math.max(0, Math.ceil((since + delay.seconds * 1000 - now) / 1000))
+    return left ? `按设定间隔等待，还剩 ${Math.floor(left / 60)} 分 ${left % 60} 秒${delay.nextEmail ? `，随后切换到 ${delay.nextEmail}` : ''}` : '间隔已结束，等待脚本上报下一步'
+}
 
 export function elapsed(start, end = Date.now()) {
     const ms = Number.isFinite(Number(start)) ? Number(start) : Date.parse(start)
@@ -37,6 +44,17 @@ export function runView(info, { pending = null, error = null } = {}) {
             title: stopping ? '正在结束本轮签到' : '签到正在进行', tone: 'running',
             description: stopping ? '正在关闭脚本并保存记录，请稍等。停止通常需要几秒钟。' : info?.run?.pendingDelay ? '脚本正在按设定间隔等待，状态会自动更新。' : '脚本在服务器后台运行，关闭页面也会继续。',
             hint: '可以随时停止；已完成的任务和已获得的积分会保留。' }
+        if (!stopping) {
+            const waiting = waitMessage(info?.run?.pendingDelay)
+            const progress = sameRun ? info?.progress : null
+            if (waiting) { view.task = '正常等待'; view.description = waiting }
+            else if (progress) {
+                const phase = /login|sign.?in|authentication|登录|验证/i.test(progress.title + ' ' + progress.message) ? '账号登录'
+                    : progress.title === 'PANEL-QUERY' ? '准备国内搜索词' : null
+                if (phase) view.task = phase
+                view.description = `${progress.title === 'PANEL-QUERY' ? progress.message.slice(0, 180) : `正在处理${phase || view.task}，具体输出可在任务记录中查看`} · 距上次进展 ${elapsed(progress.at)}`
+            }
+        }
     } else if (info?.authorization) {
         view = { ...view, badge: '等待登录', title: '先完成正在进行的账号登录', tone: 'attention',
             description: '账号登录和签到共用浏览器，请完成或结束登录后再运行。',
@@ -69,7 +87,7 @@ export function runView(info, { pending = null, error = null } = {}) {
 
 export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
     const $ = selector => document.querySelector(selector)
-    let info, pending = null, error = null, timer, active = false, fetching = false, queued = false, epoch = 0
+    let info, pending = null, error = null, timer, tick, active = false, fetching = false, queued = false, epoch = 0
     function render() {
         const view = runView(info, { pending, error })
         $('#run-console').dataset.tone = view.tone
@@ -135,10 +153,10 @@ export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
             error = { message: `停止请求未确认：${err.message}。请刷新状态确认脚本是否仍在运行。` }
         } finally { epoch++; pending = null; render(); void refresh() }
     }
-    function stop() { active = false; epoch++; queued = false; clearTimeout(timer) }
+    function stop() { active = false; epoch++; queued = false; clearTimeout(timer); clearInterval(tick) }
     document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(timer); else if (active) void refresh() })
     $('#btn-run-all').addEventListener('click', () => start())
     $('#btn-stop-run').addEventListener('click', stopRun)
     $('#btn-run-records').addEventListener('click', () => onAction('logs', null, info))
-    return { start, refresh, render, stop, open() { active = true; void refresh() } }
+    return { start, refresh, render, stop, open() { active = true; clearInterval(tick); tick = setInterval(() => { if (!document.hidden && ACTIVE.has(info?.state)) render() }, 1000); void refresh() } }
 }

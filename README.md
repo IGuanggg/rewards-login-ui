@@ -2,15 +2,17 @@
 
 给 [TheNetsky/Microsoft-Rewards-Script](https://github.com/TheNetsky/Microsoft-Rewards-Script) 用的**本地签到与授权控制台**：在网页上添加账号 → 登录微软账号 → 一键运行签到，支持停止运行、任务记录和可视化设置。登录会话自动写回 `sessions.db`，之后签到时复用。
 
-界面风格参考 [linux-do/cdk](https://github.com/linux-do/cdk)（居中单列入口、液态按钮、极细描边、弹窗式交互），零构建、零依赖，只用 Node.js 内置模块。
+界面风格参考 [linux-do/cdk](https://github.com/linux-do/cdk)（浅色中性底色、灰色圆角卡片、轻量描边、底部导航），零构建、零依赖，只用 Node.js 内置模块。
 
 **无桌面服务器 / Docker：** 已提供完整 Chromium 和按需远程授权方案，详见 [Docker 部署说明](docs/Docker部署.md)。在此目录执行 `docker compose up -d --build`，授权时从面板打开远程浏览器；默认内存上限 1.5 GiB。
 
-**签到工作台：** 首页直接一键运行全部账号或停止，账号列表可单独运行，实时查看当前账号、任务、耗时和确认积分。「环境与设置 → 签到设置」提供任务开关、搜索/账号间隔、搜索词来源和每日定时，保存后无需重启。详见 [工作台与设置说明](docs/签到工作台与设置-2026-10-26.md)。
+**国区升级（2.1）：** Docker 默认使用国内热词和中文本地兜底，支持纯中文离线词源、搜索/阅读间隔设置、真实等待倒计时、14 天积分趋势、每账号余额和 PushPlus / Server酱结果通知。保留固定版本上游内核与现有会话结构，无新增服务或前端框架。详见 [国区升级说明](docs/国区升级-2026-10-26.md)。
 
-**签到记录：** Docker 模式下，点击「查看任务记录」或进入「运行日志」，可按日期查看每轮签到的任务、结果、积分及原始输出，保存最近 30 天。详见 [签到任务记录](docs/签到任务记录-2026-10-26.md)。
+**签到工作台：** 首页直接一键运行全部账号或停止，账号列表可单独运行，实时查看当前账号、任务、耗时和确认积分。「设置 → 签到设置」提供任务开关、搜索/账号间隔、搜索词来源和每日定时，保存后无需重启。详见 [工作台与设置说明](docs/签到工作台与设置-2026-10-26.md)。
 
-![解锁页](docs/shots/unlock.png)
+**签到记录：** Docker 模式下，点击「查看任务记录」或进入「任务记录」，可按日期查看每轮签到的任务、结果、积分及原始输出，保存最近 30 天。详见 [签到任务记录](docs/签到任务记录-2026-10-26.md)。
+
+![国区控制台空状态预览](docs/china-dashboard-preview.jpg)
 
 ---
 
@@ -191,10 +193,11 @@ npm run api
 # 27 项自动化回归（临时沙箱、虚构数据，跑完自动清理）
 node tools/acceptance.mjs
 
-# Docker、持久化记录和工作台/设置检查（另 22 项）
+# Docker、持久化记录和工作台/设置与国区检查（另 28 项）
 npm run test:docker
 npm run test:activity
 npm run test:run
+npm run test:china
 
 # 重新生成 docs/shots 下的全部截图
 node tools/ui-shots.mjs

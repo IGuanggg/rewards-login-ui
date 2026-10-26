@@ -33,3 +33,7 @@ data/
 
 # Persistent sign-in activity journal
 activity.db*
+
+# Local notification credentials
+notifications.json
+notifications.json.tmp

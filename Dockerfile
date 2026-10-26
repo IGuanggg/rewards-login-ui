@@ -13,6 +13,7 @@ ENV NODE_ENV=production TZ=Asia/Shanghai \
     BOT_DIR=/opt/rewards PANEL_CONFIG=/data/panel.json
 WORKDIR /opt/rewards
 COPY --from=builder /opt/rewards/package*.json ./
+COPY --from=builder /opt/rewards/LICENSE ./LICENSE
 COPY --from=builder /opt/rewards/node_modules ./node_modules
 COPY --from=builder /opt/rewards/dist ./dist
 # The official headless image omits these manual-login dependencies.

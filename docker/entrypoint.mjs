@@ -17,7 +17,13 @@ const accountFile = path.join(data, 'accounts.env')
 if (!fs.existsSync(accountFile)) fs.writeFileSync(accountFile, '# Accounts managed by Rewards panel\n', { mode: 0o600 })
 const botConfig = path.join(data, 'bot-config.json')
 const sourceConfig = fs.existsSync(botConfig) ? botConfig : path.join(root, 'config.example.json')
-writeJson(botConfig, lowMemoryConfig(JSON.parse(fs.readFileSync(sourceConfig, 'utf8')), '/data/sessions'))
+const initial = JSON.parse(fs.readFileSync(sourceConfig, 'utf8'))
+initial.panelQueryMode ||= 'china'
+if (['china', 'china-local'].includes(initial.panelQueryMode)) {
+    initial.searchSettings.queryEngines = ['local']
+    initial.searchOnBingLocalQueries = true
+}
+writeJson(botConfig, lowMemoryConfig(initial, '/data/sessions'))
 for (const [name, target] of [['.env', accountFile], ['config.json', botConfig]]) {
     const file = path.join(root, name)
     if (fs.existsSync(file) || fs.lstatSync(file, { throwIfNoEntry: false })) fs.unlinkSync(file)
@@ -74,11 +80,15 @@ try {
                 const health = await fetch('http://127.0.0.1:3010/health', { headers, signal: AbortSignal.timeout(3000) }).then(r => r.json())
                 if (health.state !== 'idle' || spawnSync('flock', ['--nonblock', LOCK_FILE, 'true']).status !== 0) {
                     fs.writeFileSync(marker, date)
+                    writeJson(path.join(data, 'schedule-state.json'), { day: date, at: Date.now(), state: 'skipped', reason: '到点时浏览器忙碌，今日定时已跳过' })
                     console.log(`[schedule] ${date} skipped: browser busy`)
                     return
                 }
                 const response = await fetch('http://127.0.0.1:3010/start', { method: 'POST', headers, body: '{}', signal: AbortSignal.timeout(5000) })
-                if (response.ok) fs.writeFileSync(marker, date)
+                if (response.ok) {
+                    fs.writeFileSync(marker, date)
+                    writeJson(path.join(data, 'schedule-state.json'), { day: date, at: Date.now(), state: 'started', reason: '已按计划启动签到' })
+                } else writeJson(path.join(data, 'schedule-state.json'), { day: date, at: Date.now(), state: 'failed', reason: '定时启动请求失败，请检查签到服务' })
             } catch (error) { console.error(`[schedule] ${error.message}`) }
             finally { scheduling = false }
         }, 15000)

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { lowMemoryConfig, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
 import { createRunRecorder } from '../lib/run-recorder.mjs'
+import { notifyRun } from '../lib/notifications.mjs'
 
 const root = process.env.BOT_DIR || '/opt/rewards'
 const mode = process.argv[2]
@@ -54,7 +55,9 @@ try {
         console.log('__PANEL_DESKTOP_READY__ 在面板点击“打开远程浏览器”完成登录。')
     } else {
         const file = path.join(root, 'config.json')
-        writeJson(file, lowMemoryConfig(JSON.parse(fs.readFileSync(file, 'utf8'))))
+        const config = lowMemoryConfig(JSON.parse(fs.readFileSync(file, 'utf8')))
+        env.PANEL_QUERY_MODE = config.panelQueryMode || 'existing'
+        writeJson(file, config)
         delete env.DISPLAY
         env.FORCE_HEADLESS = '1'
     }
@@ -83,7 +86,11 @@ try {
 } finally {
     await stop(result)
     if (browserClosed) await browserClosed
-    recorder?.finish(result, cancelled)
+    const run = recorder?.finish(result, cancelled)
+    if (run) {
+        try { await notifyRun(process.env.PANEL_CONFIG || '/data/panel.json', run) }
+        catch { console.error('[notification] 通知发送失败；签到结果已保存，请检查通知渠道设置。') }
+    }
     clearTimeout(timeout)
 }
 process.exitCode = result

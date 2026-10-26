@@ -6,6 +6,8 @@
 import { createActivityPanel } from './activity.js'
 import { createRunConsole } from './run-console.js'
 import { createTaskSettings } from './task-settings.js'
+import { createDashboard } from './dashboard.js'
+import { createNotifications } from './notifications.js'
 
 const $ = (selector, root = document) => root.querySelector(selector)
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)]
@@ -33,6 +35,8 @@ const escapeHtml = value =>
     String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch])
 
 const timeOf = ts => (ts ? new Date(Number(ts)).toLocaleTimeString('zh-CN', { hour12: false }) : '—')
+const dashboard = createDashboard({ api, escapeHtml, onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码') })
+const notifications = createNotifications({ api, onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码') })
 const activityPanel = createActivityPanel({ api, escapeHtml, timeOf, onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码') })
 const runConsole = createRunConsole({ api,
     onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码'),
@@ -151,6 +155,7 @@ function showView(name) {
     $('#appfoot').hidden = name !== 'app'
     if (name !== 'app') {
         runConsole.stop()
+        dashboard.stop()
         activityPanel.stop()
         closeFeed()
         closeJobStream()
@@ -179,9 +184,11 @@ function showSetup() {
 function showApp() {
     showView('app')
     runConsole.open()
-    $('#topbar-path').textContent = '本机账号工作台'
+    if ($('#tabs .is-active')?.dataset.tab === 'dashboard') dashboard.open()
+    $('#topbar-path').textContent = '中国大陆 · 签到工作台'
     $('#topbar-path').title = state.botDir
-    $('#appfoot-path').textContent = state.botDir
+    $('#appfoot-path').textContent = '配置、会话与运行记录保存在实例数据目录'
+    $('#appfoot-path').title = state.botDir
     $('#s-botdir').value = state.botDir
     $('#s-control-api').value = state.control?.base || ''
 }
@@ -895,8 +902,11 @@ function bindEvents() {
         for (const other of $$('.tab')) {
             other.classList.toggle('is-active', other === tab)
             other.setAttribute('aria-selected', String(other === tab))
+            other.tabIndex = other === tab ? 0 : -1
         }
         const active = tab.dataset.tab
+        $('#panel-dashboard').hidden = active !== 'dashboard'
+        if (active === 'dashboard') dashboard.open(); else dashboard.stop()
         $('#panel-accounts').hidden = active !== 'accounts'
         $('#panel-logs').hidden = active !== 'logs'
         $('#panel-settings').hidden = active !== 'settings'
@@ -905,7 +915,21 @@ function bindEvents() {
             openFeed()
             renderFeed()
         } else activityPanel.stop()
-        if (active === 'settings') { refreshState(); taskSettings.load() }
+        if (active === 'settings') { refreshState(); taskSettings.load(); notifications.load() }
+    })
+    for (const tab of $$('#tabs .tab')) {
+        tab.id = `tab-${tab.dataset.tab}`
+        tab.setAttribute('aria-controls', `panel-${tab.dataset.tab}`)
+        tab.tabIndex = tab.classList.contains('is-active') ? 0 : -1
+        const panel = $(`#panel-${tab.dataset.tab}`)
+        panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', tab.id)
+    }
+    $('#tabs').addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+        event.preventDefault()
+        const tabs = $$('#tabs .tab'), i = tabs.indexOf(document.activeElement)
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (i + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+        tabs[next].focus(); tabs[next].click()
     })
 
     for (const button of [$('#btn-theme'), $('#btn-entry-theme')]) {
