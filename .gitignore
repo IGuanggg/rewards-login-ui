@@ -30,3 +30,6 @@ docs/design-backup-*/
 
 # Docker persistent credentials and sessions
 data/
+
+# Persistent sign-in activity journal
+activity.db*

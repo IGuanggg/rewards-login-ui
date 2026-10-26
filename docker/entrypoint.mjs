@@ -4,6 +4,8 @@ import { randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { LOCK_FILE, lowMemoryConfig, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
+import { ActivityStore, activityFile } from '../lib/activity-store.mjs'
+import { readSchedule, scheduleDate } from '../lib/task-settings.mjs'
 
 process.umask(0o077)
 if (['1', 'true', 'yes', 'on'].includes(String(process.env.PANEL_NO_AUTH).toLowerCase())) throw new Error('Docker 远程授权要求启用面板访问密码')
@@ -22,6 +24,10 @@ for (const [name, target] of [['.env', accountFile], ['config.json', botConfig]]
     fs.symlinkSync(target, file)
 }
 const panelFile = process.env.PANEL_CONFIG || path.join(data, 'panel.json')
+const activity = new ActivityStore(activityFile(panelFile))
+activity.interruptRunning()
+activity.prune()
+activity.close()
 const panel = fs.existsSync(panelFile) ? JSON.parse(fs.readFileSync(panelFile, 'utf8')) : {}
 panel.botDir = root
 panel.controlApi = 'http://127.0.0.1:3010'
@@ -54,27 +60,30 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { void shut
 try {
     await waitForPort(3010, api)
     if (!stopping) children.push(start(process.execPath, [path.join(panelRoot, 'server.js')], { cwd: panelRoot, env }))
-    const runAt = String(process.env.RUN_AT || '').trim()
-    if (runAt && !/^([01]\d|2[0-3]):[0-5]\d$/.test(runAt)) throw new Error('RUN_AT must be empty or HH:MM')
-    if (runAt) {
-        const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: process.env.TZ || 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' })
+    {
         let scheduling = false
         const marker = path.join(data, 'last-scheduled-date')
         scheduleTimer = setInterval(async () => {
             if (stopping || scheduling) return
-            const [date, time] = formatter.format(new Date()).split(' ')
-            if (time !== runAt || (fs.existsSync(marker) && fs.readFileSync(marker, 'utf8') === date)) return
             scheduling = true
             try {
+                const schedule = readSchedule(panelFile)
+                const date = scheduleDate(schedule, Date.now(), fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8') : '')
+                if (!date) return
                 const headers = { Authorization: `Bearer ${panel.controlToken}`, 'Content-Type': 'application/json' }
                 const health = await fetch('http://127.0.0.1:3010/health', { headers, signal: AbortSignal.timeout(3000) }).then(r => r.json())
-                if (health.state !== 'idle' || spawnSync('flock', ['--nonblock', LOCK_FILE, 'true']).status !== 0) return
+                if (health.state !== 'idle' || spawnSync('flock', ['--nonblock', LOCK_FILE, 'true']).status !== 0) {
+                    fs.writeFileSync(marker, date)
+                    console.log(`[schedule] ${date} skipped: browser busy`)
+                    return
+                }
                 const response = await fetch('http://127.0.0.1:3010/start', { method: 'POST', headers, body: '{}', signal: AbortSignal.timeout(5000) })
                 if (response.ok) fs.writeFileSync(marker, date)
             } catch (error) { console.error(`[schedule] ${error.message}`) }
             finally { scheduling = false }
         }, 15000)
-        console.log(`[schedule] Daily at ${runAt} (${process.env.TZ || 'Asia/Shanghai'}); skip while busy`)
+        const schedule = readSchedule(panelFile)
+        console.log(`[schedule] ${schedule.enabled ? `Daily at ${schedule.runAt}` : 'Disabled'} (${schedule.timezone}); editable in panel, skip while busy`)
     }
     const code = await Promise.race(children.map(child => child.done))
     if (!stopping) await shutdown(code || 1)

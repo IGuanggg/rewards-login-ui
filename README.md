@@ -1,10 +1,14 @@
 # Rewards 控制台
 
-给 [TheNetsky/Microsoft-Rewards-Script](https://github.com/TheNetsky/Microsoft-Rewards-Script) 用的**本地登录面板**：不用再手改 `.env`、不用记命令行参数，在网页上填账号 → 点「授权」→ 在弹出的浏览器里完成微软登录 → 会话自动写回 `sessions.db`，之后签到时直接复用。
+给 [TheNetsky/Microsoft-Rewards-Script](https://github.com/TheNetsky/Microsoft-Rewards-Script) 用的**本地签到与授权控制台**：在网页上添加账号 → 登录微软账号 → 一键运行签到，支持停止运行、任务记录和可视化设置。登录会话自动写回 `sessions.db`，之后签到时复用。
 
 界面风格参考 [linux-do/cdk](https://github.com/linux-do/cdk)（居中单列入口、液态按钮、极细描边、弹窗式交互），零构建、零依赖，只用 Node.js 内置模块。
 
 **无桌面服务器 / Docker：** 已提供完整 Chromium 和按需远程授权方案，详见 [Docker 部署说明](docs/Docker部署.md)。在此目录执行 `docker compose up -d --build`，授权时从面板打开远程浏览器；默认内存上限 1.5 GiB。
+
+**签到工作台：** 首页直接一键运行全部账号或停止，账号列表可单独运行，实时查看当前账号、任务、耗时和确认积分。「环境与设置 → 签到设置」提供任务开关、搜索/账号间隔、搜索词来源和每日定时，保存后无需重启。详见 [工作台与设置说明](docs/签到工作台与设置-2026-10-26.md)。
+
+**签到记录：** Docker 模式下，点击「查看任务记录」或进入「运行日志」，可按日期查看每轮签到的任务、结果、积分及原始输出，保存最近 30 天。详见 [签到任务记录](docs/签到任务记录-2026-10-26.md)。
 
 ![解锁页](docs/shots/unlock.png)
 
@@ -88,6 +92,8 @@ node D:\tools\rewards-login-ui\server.js
 
 ## 界面
 
+以下截图来自早期版本；当前首页增加签到工作台，账号编辑使用弹窗，新增签到设置以实际页面和上方说明为准。
+
 ### 首次设置：环境自检
 
 ![环境自检](docs/shots/setup.png)
@@ -98,9 +104,9 @@ node D:\tools\rewards-login-ui\server.js
 
 ![工作台](docs/shots/dashboard.png)
 
-- 左侧列出 `.env` 里全部 `ACCOUNT_N_*`，带会话状态：绿色=已保存会话（cookie 数 + 时间），灰色=未授权。
-- 每行四个动作：**授权**、**签到**（走 Control API）、**编辑**、**删除**。
-- 右侧表单新增/编辑账号：邮箱、密码、TOTP、国家/地区、语言；代理、备用邮箱、指纹开关收在「高级选项」。
+- 列出 `.env` 里全部 `ACCOUNT_N_*`，显示手机/电脑会话是否已保存及更新时间。
+- 每行直接提供**运行此账号**、**登录账号**；**编辑**、**删除**收在「更多」菜单。
+- 弹窗表单新增/编辑账号：邮箱、密码、TOTP、国家/地区、语言；代理、备用邮箱、指纹开关收在「高级选项」。
 - 编辑时密码、TOTP、备用邮箱、代理、**指纹开关**留空/未改动即保持原值。
 
 ### 授权结果以会话文件为准
@@ -182,8 +188,13 @@ npm run api
 ## 测试与自测
 
 ```bash
-# 23 项自动化回归（临时沙箱、虚构数据，跑完自动清理）
+# 27 项自动化回归（临时沙箱、虚构数据，跑完自动清理）
 node tools/acceptance.mjs
+
+# Docker、持久化记录和工作台/设置检查（另 22 项）
+npm run test:docker
+npm run test:activity
+npm run test:run
 
 # 重新生成 docs/shots 下的全部截图
 node tools/ui-shots.mjs
@@ -195,7 +206,7 @@ node tools/ui-shots.mjs
 
 1. `node server.js` → 输入终端打印的密码；
 2. 首次设置页填仓库路径，确认自检全绿（缺依赖按提示 `npm install` / `npx patchright install chromium`）；
-3. 添加账号 → 点「授权」→ 在弹出浏览器里完成微软登录；
+3. 添加账号 → 点「登录账号」→ 在本机窗口或 Docker 远程浏览器中完成微软登录；
 4. 弹窗出现「移动端 已写入 · N cookies」即成功；显示「未写入」时会给出原因；
 5. 关闭面板再启动，账号行仍显示「移动端 · N cookies · x 分钟前」= 会话可复用；
 6. 两端都要：选「两端都授权」，只完成一端会显示 `partial` 并指出缺哪个平台；
@@ -242,7 +253,7 @@ rewards-login-ui/
 │   ├── css/styles.css     # 设计令牌、背景氛围、液态按钮、响应式
 │   └── js/app.js          # 视图切换、表单、SSE 日志流、主题
 ├── tools/
-│   ├── acceptance.mjs     # 23 项回归测试
+│   ├── acceptance.mjs     # 27 项回归测试
 │   └── ui-shots.mjs       # 截图生成
 ├── docs/
 │   ├── 修复验证报告-2026-10-22.md

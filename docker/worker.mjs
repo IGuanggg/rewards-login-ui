@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { lowMemoryConfig, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
+import { createRunRecorder } from '../lib/run-recorder.mjs'
 
 const root = process.env.BOT_DIR || '/opt/rewards'
 const mode = process.argv[2]
@@ -9,6 +10,9 @@ let stopping = false
 let result = 1
 let timeout
 let cleanup
+let recorder
+let browserClosed
+let cancelled = false
 
 function stop(code) {
     if (stopping) return cleanup
@@ -18,7 +22,7 @@ function stop(code) {
     cleanup = stopAll([...children].reverse())
     return cleanup
 }
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { void stop(143) })
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { cancelled = true; void stop(143) })
 
 try {
     if (!['login', 'bot'].includes(mode)) throw new Error('Worker mode must be login or bot')
@@ -56,7 +60,16 @@ try {
     }
     if (stopping) throw new Error('Worker stopped')
     const script = path.join(root, mode === 'login' ? 'scripts/main/manualLogin.js' : 'dist/index.js')
-    const browser = start(process.execPath, [script, ...process.argv.slice(3)], { cwd: root, env })
+    if (mode === 'bot') {
+        try { recorder = await createRunRecorder(root, process.env.PANEL_CONFIG || '/data/panel.json') }
+        catch (error) { console.error(`[activity] 无法创建运行记录：${error.message}`) }
+    }
+    if (stopping) throw new Error('Worker stopped')
+    const browser = start(process.execPath, [script, ...process.argv.slice(3)], {
+        cwd: root, env, ...(recorder ? { stdio: ['ignore', 'pipe', 'pipe'] } : {})
+    })
+    browserClosed = new Promise(resolve => browser.once('close', resolve))
+    recorder?.attach(browser)
     children.push(browser)
     // A failed display/proxy must also end the browser, not leave a hidden task.
     const first = await Promise.race([
@@ -69,6 +82,8 @@ try {
     if (!stopping) await stop(1)
 } finally {
     await stop(result)
+    if (browserClosed) await browserClosed
+    recorder?.finish(result, cancelled)
     clearTimeout(timeout)
 }
 process.exitCode = result

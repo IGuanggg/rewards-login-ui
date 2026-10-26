@@ -150,7 +150,14 @@ test('Docker panel blocks login during a run and reserves concurrent start reque
     fs.writeFileSync(path.join(bot, 'package.json'), JSON.stringify({ name: 'microsoft-rewards-script' }))
     fs.writeFileSync(path.join(bot, 'scripts/main/manualLogin.js'), 'throw new Error("Must not launch during run")')
     fs.writeFileSync(path.join(bot, 'scripts/utils.js'), '')
-    fs.writeFileSync(path.join(bot, '.env'), 'ACCOUNT_1_EMAIL=test@example.com\n')
+    fs.writeFileSync(path.join(bot, '.env'), 'ACCOUNT_1_EMAIL=test@example.com\nACCOUNT_1_PASSWORD=synthetic\n')
+    fs.writeFileSync(path.join(bot, 'config.json'), JSON.stringify({ sessionPath: 'sessions' }))
+    fs.mkdirSync(path.join(bot, 'dist'), { recursive: true })
+    fs.writeFileSync(path.join(bot, 'dist/index.js'), '')
+    for (const dep of ['patchright', 'fingerprint-generator', 'fingerprint-injector', 'otpauth', 'ghost-cursor-playwright-port']) fs.mkdirSync(path.join(bot, 'node_modules', dep), { recursive: true })
+    const browsers = path.join(dir, 'browsers')
+    fs.mkdirSync(path.join(browsers, 'chromium-1/chrome-win64'), { recursive: true })
+    fs.writeFileSync(path.join(browsers, 'chromium-1/chrome-win64/chrome.exe'), 'synthetic file, never launched')
     let remoteState = 'running'
     let starts = 0
     const control = http.createServer((req, res) => {
@@ -173,7 +180,7 @@ test('Docker panel blocks login during a run and reserves concurrent start reque
     const config = path.join(dir, 'panel.json')
     fs.writeFileSync(config, JSON.stringify({ botDir: bot, panelToken: 'docker-test-token', controlApi: `http://127.0.0.1:${control.address().port}` }))
     const child = spawn(process.execPath, [fileURLToPath(new URL('../server.js', import.meta.url))], {
-        env: { ...process.env, PANEL_PORT: String(port), PANEL_HOST: '127.0.0.1', PANEL_CONFIG: config, PANEL_TOKEN: 'docker-test-token', PANEL_NO_AUTH: '0', PANEL_REMOTE_DESKTOP: '1', BOT_DIR: bot },
+        env: { ...process.env, PANEL_PORT: String(port), PANEL_HOST: '127.0.0.1', PANEL_CONFIG: config, PANEL_TOKEN: 'docker-test-token', PANEL_NO_AUTH: '0', PANEL_REMOTE_DESKTOP: '1', BOT_DIR: bot, PLAYWRIGHT_BROWSERS_PATH: browsers },
         stdio: 'ignore', windowsHide: true
     })
     t.after(async () => { if (child.exitCode === null) { child.kill(); await once(child, 'exit') } })

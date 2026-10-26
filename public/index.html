@@ -132,7 +132,7 @@
                     </div>
 
                     <nav class="tabs" id="tabs" role="tablist" aria-label="主导航">
-                        <button class="tab is-active" role="tab" data-tab="accounts" aria-selected="true">账号授权</button>
+                        <button class="tab is-active" role="tab" data-tab="accounts" aria-selected="true">签到与账号</button>
                         <button class="tab" role="tab" data-tab="logs" aria-selected="false">运行日志</button>
                         <button class="tab" role="tab" data-tab="settings" aria-selected="false">环境与设置</button>
                     </nav>
@@ -146,6 +146,30 @@
                         <button class="ghost-btn ghost-btn--bordered" id="btn-logout">退出</button>
                     </div>
                 </header>
+
+                <section class="run-console" id="run-console" aria-labelledby="run-title" data-tone="idle">
+                    <div class="run-console__main">
+                        <div class="run-console__eyebrow"><span>签到工作台</span><span class="run-badge" id="run-badge" role="status">正在读取状态</span></div>
+                        <h2 id="run-title">今天的签到，从这里开始</h2>
+                        <p id="run-description">正在连接签到服务，读取账号和运行状态…</p>
+                        <div class="run-console__actions">
+                            <button class="liquid-btn liquid-btn--solid" id="btn-run-all" type="button" disabled>
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                                <span class="liquid-btn__text">一键运行签到</span>
+                            </button>
+                            <button class="ghost-btn ghost-btn--bordered run-console__stop" id="btn-stop-run" type="button" hidden>停止运行</button>
+                            <button class="ghost-btn ghost-btn--bordered" id="btn-run-records" type="button">查看任务记录 <span aria-hidden="true">→</span></button>
+                        </div>
+                        <p class="run-console__schedule" id="run-schedule">正在读取定时设置…</p>
+                    </div>
+                    <dl class="run-console__metrics">
+                        <div><dt>当前账号 / 最近账号</dt><dd id="run-current-account">—</dd></div>
+                        <div><dt>当前任务 / 最近结果</dt><dd id="run-current-task">—</dd></div>
+                        <div><dt>本轮耗时</dt><dd id="run-elapsed">—</dd></div>
+                        <div><dt>本轮确认积分</dt><dd id="run-earned">待确认</dd></div>
+                    </dl>
+                    <div class="run-console__guidance"><p id="run-guidance">添加账号 → 登录账号 → 一键运行签到。</p><button class="ghost-btn ghost-btn--bordered" id="run-next-action" type="button" hidden></button></div>
+                </section>
 
                 <div class="panel-grid" id="panel-accounts">
                     <div class="workspace-heading">
@@ -167,7 +191,6 @@
                                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                         刷新
                                     </button>
-                                    <button class="ghost-btn ghost-btn--bordered" id="btn-run-all" title="通过上游 Control API 运行签到">运行签到</button>
                                 </div>
                             </div>
                             <ul class="account-list" id="account-list"></ul>
@@ -195,7 +218,7 @@
                         <div class="card__head">
                             <div>
                                 <h2 id="form-title">添加微软账号</h2>
-                                <p class="muted" id="form-lead">只需邮箱。保存后点「连接」，在弹出的浏览器里登录一次。</p>
+                                <p class="muted" id="form-lead">先添加邮箱，再点「登录账号」完成一次微软登录，最后一键运行签到。</p>
                             </div>
                             <button class="icon-btn form-close" id="btn-close-form" type="button" aria-label="关闭" hidden>
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -301,10 +324,58 @@
                 </div>
 
                 <div class="panel-single" id="panel-logs" hidden>
+                    <section class="card activity-card" aria-labelledby="activity-title">
+                        <div class="card__head">
+                            <div>
+                                <h2 id="activity-title">签到任务记录</h2>
+                                <p>查看每天运行了哪些任务、执行结果和获得的积分。</p>
+                            </div>
+                            <div class="card__head-actions activity-controls">
+                                <label>运行日期<input type="date" id="activity-day" /></label>
+                                <button class="ghost-btn ghost-btn--bordered" id="activity-today">今天</button>
+                                <button class="ghost-btn ghost-btn--bordered" id="activity-refresh">刷新</button>
+                            </div>
+                        </div>
+                        <div class="activity-stats" aria-label="当日签到汇总">
+                            <div><span>签到轮次</span><strong id="activity-runs">—</strong></div>
+                            <div><span>任务明细</span><strong id="activity-tasks">—</strong></div>
+                            <div><span>已获积分</span><strong id="activity-points">—</strong></div>
+                            <div><span>需要关注</span><strong id="activity-attention">—</strong></div>
+                        </div>
+                        <p class="activity-note" id="activity-note" role="status">进入此页后读取签到记录。</p>
+                        <div class="activity-empty" id="activity-empty" hidden>
+                            <strong>这一天还没有签到记录</strong>
+                            <p>从「账号授权」页运行签到后，这里会自动显示任务与结果。</p>
+                        </div>
+                        <div class="activity-detail" id="activity-detail" hidden>
+                            <div class="activity-run-picker">
+                                <label>选择一轮签到<select id="activity-run-select"></select></label>
+                                <span class="tag" id="activity-run-state"></span>
+                                <span class="muted" id="activity-duration"></span>
+                            </div>
+                            <p class="activity-note" id="activity-accounts"></p>
+                            <div class="activity-table-wrap" tabindex="0" aria-label="签到任务明细，可横向滚动">
+                                <table class="activity-table">
+                                    <thead><tr><th>开始时间</th><th>账号</th><th>任务</th><th>平台</th><th>结果</th><th>积分</th></tr></thead>
+                                    <tbody id="activity-task-list"></tbody>
+                                </table>
+                            </div>
+                            <details class="activity-raw" id="activity-raw">
+                                <summary>查看这轮签到的原始日志</summary>
+                                <div class="activity-log-toolbar">
+                                    <label>日志级别<select id="activity-log-level"><option value="all">全部</option><option value="warn">警告</option><option value="error">错误</option><option value="info">信息</option></select></label>
+                                    <button class="ghost-btn ghost-btn--bordered" id="activity-log-older" hidden>更早日志</button>
+                                    <button class="ghost-btn ghost-btn--bordered" id="activity-log-latest" hidden>回到最新日志</button>
+                                    <span class="muted">默认显示最近 200 行</span>
+                                </div>
+                                <div class="log-view" id="activity-log-output" role="log"></div>
+                            </details>
+                        </div>
+                    </section>
                     <section class="card card--logs">
                         <div class="card__head">
                             <div>
-                                <h2>运行日志</h2>
+                                <h2>账号授权日志</h2>
                                 <p class="muted" id="logs-hint">等待连接…</p>
                             </div>
                             <div class="card__head-actions">
@@ -327,6 +398,39 @@
                 </div>
 
                 <div class="panel-single" id="panel-settings" hidden>
+                    <section class="card">
+                        <div class="card__head"><div><h2>签到设置</h2><p>选择要做的任务、运行节奏和每日定时。</p></div><button class="ghost-btn ghost-btn--bordered" type="button" id="task-settings-reload">重新读取</button></div>
+                        <form id="task-settings-form" class="task-settings-form">
+                            <fieldset id="task-settings-fields" disabled>
+                                <legend>要运行哪些任务</legend>
+                                <div class="task-options" id="task-options"></div>
+                                <div class="task-settings-columns">
+                                    <fieldset><legend>运行间隔</legend>
+                                        <p class="settings-note">每次间隔在最小值和最大值之间随机选择，单位为秒。</p>
+                                        <div class="field-row">
+                                            <label class="field"><span class="field__label">搜索最小间隔</span><span class="field__control"><input type="number" id="task-searchDelay-min" min="30" max="3600" required></span></label>
+                                            <label class="field"><span class="field__label">搜索最大间隔</span><span class="field__control"><input type="number" id="task-searchDelay-max" min="30" max="3600" required></span></label>
+                                            <label class="field"><span class="field__label">账号切换最小间隔</span><span class="field__control"><input type="number" id="task-accountDelay-min" min="0" max="3600" required></span></label>
+                                            <label class="field"><span class="field__label">账号切换最大间隔</span><span class="field__control"><input type="number" id="task-accountDelay-max" min="0" max="3600" required></span></label>
+                                        </div>
+                                        <label class="field"><span class="field__label">搜索词来源</span><select id="task-query-mode"><option value="existing">保留当前来源</option><option value="local">仅本地词库</option><option value="default">恢复上游默认来源</option></select></label>
+                                        <p class="settings-note">本地词库无需请求第三方热榜接口。搜索任务仍需联网。</p>
+                                        <label class="task-option"><input type="checkbox" id="task-stop-warning"><span>不忽略脚本的风控警告</span></label>
+                                        <label class="task-option"><input type="checkbox" id="task-skip-empty"><span>跳过没有积分的任务</span></label>
+                                    </fieldset>
+                                    <fieldset id="task-schedule-fields"><legend>每日定时</legend>
+                                        <label class="task-option"><input type="checkbox" id="task-schedule-enabled"><span>每天自动运行一次</span></label>
+                                        <label class="field"><span class="field__label">每天开始时间</span><span class="field__control"><input type="time" id="task-schedule-time" required></span></label>
+                                        <p class="settings-note" id="task-schedule-zone"></p>
+                                        <p class="settings-note" id="task-schedule-unsupported" hidden>当前实例不支持面板定时；Docker 部署后可直接设置。</p>
+                                        <div class="task-settings-tip"><strong>省内存运行</strong><p>账号依次执行，搜索不并发。远程浏览器只在登录时启动，签到使用无头浏览器。</p></div>
+                                    </fieldset>
+                                </div>
+                                <div class="form-actions"><button class="ghost-btn ghost-btn--bordered" id="task-settings-save" type="submit">保存签到设置</button></div>
+                            </fieldset>
+                            <p class="settings-note" id="task-settings-note" role="status">打开后会读取实际脚本配置。</p>
+                        </form>
+                    </section>
                     <section class="card">
                         <div class="card__head">
                             <div>
@@ -424,9 +528,11 @@
                         <span class="job-status__time mono-dim" id="job-time"></span>
                     </div>
                     <p class="job-hint" id="job-hint" hidden></p>
-                    <div id="remote-browser" hidden>
-                        <p class="muted">在远程浏览器里完成微软登录。授权结束后窗口会自动断开，释放服务器资源。</p>
-                        <a class="ghost-btn ghost-btn--bordered" id="remote-browser-link" target="_blank" rel="noopener">打开远程浏览器 ↗</a>
+                    <div class="remote-browser" id="remote-browser" role="status" hidden>
+                        <strong>下一步：打开远程浏览器</strong>
+                        <p>浏览器已启动，正在等待你完成微软登录。点击下方按钮，在新窗口输入账号信息或完成验证。</p>
+                        <a class="liquid-btn liquid-btn--solid" id="remote-browser-link" target="_blank" rel="noopener"><span class="liquid-btn__text">打开远程浏览器 ↗</span></a>
+                        <p class="remote-browser__note">两端授权会先后打开移动端和桌面端登录，请保持窗口打开；全部完成后会自动保存会话。</p>
                     </div>
                     <ul class="verify-list" id="verify-list" hidden></ul>
 

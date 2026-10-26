@@ -3,6 +3,10 @@
    流程：解锁面板 → 连接上游实例（自检）→ 账号授权 → 复用会话
    ============================================================ */
 
+import { createActivityPanel } from './activity.js'
+import { createRunConsole } from './run-console.js'
+import { createTaskSettings } from './task-settings.js'
+
 const $ = (selector, root = document) => root.querySelector(selector)
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)]
 
@@ -29,6 +33,24 @@ const escapeHtml = value =>
     String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch])
 
 const timeOf = ts => (ts ? new Date(Number(ts)).toLocaleTimeString('zh-CN', { hour12: false }) : '—')
+const activityPanel = createActivityPanel({ api, escapeHtml, timeOf, onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码') })
+const runConsole = createRunConsole({ api,
+    onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码'),
+    onStart: index => { activityPanel.today(); toast('success', index == null ? '已提交全部账号签到，运行进度会自动更新' : '已提交该账号签到，运行进度会自动更新') },
+    onAction: (action, email, info) => {
+        if (action === 'logs') { if (info?.latest) activityPanel.selectRun(info.latest.run); else activityPanel.today(); $('#tabs [data-tab="logs"]').click(); return }
+        if (action === 'settings') { $('#tabs [data-tab="settings"]').click(); return }
+        if (action === 'desktop' && info?.authorization?.desktopUrl) { window.open(info.authorization.desktopUrl, '_blank', 'noopener'); return }
+        $('#tabs [data-tab="accounts"]').click()
+        if (action === 'accounts') { $('#btn-add-account').click(); return }
+        if (action === 'login') {
+            const account = state.accounts?.accounts?.find(account => account.email === email) || state.accounts?.accounts?.[0]
+            if (account) openLoginDialog(account)
+            else $('#btn-add-account').click()
+        }
+    }
+})
+const taskSettings = createTaskSettings({ api, escapeHtml, onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码'), onSaved: () => runConsole.refresh(true) })
 
 function ago(ts) {
     if (!ts) return ''
@@ -44,7 +66,11 @@ async function api(pathname, { method = 'GET', body } = {}) {
         method,
         credentials: 'same-origin',
         headers: body ? { 'Content-Type': 'application/json' } : undefined,
-        body: body ? JSON.stringify(body) : undefined
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(12000)
+    }).catch(error => {
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') throw new Error('请求超时，请刷新状态确认结果后重试')
+        throw error
     })
     let data = {}
     try {
@@ -124,6 +150,8 @@ function showView(name) {
     for (const [key, selector] of Object.entries(VIEWS)) $(selector).hidden = key !== name
     $('#appfoot').hidden = name !== 'app'
     if (name !== 'app') {
+        runConsole.stop()
+        activityPanel.stop()
         closeFeed()
         closeJobStream()
     }
@@ -150,6 +178,7 @@ function showSetup() {
 
 function showApp() {
     showView('app')
+    runConsole.open()
     $('#topbar-path').textContent = '本机账号工作台'
     $('#topbar-path').title = state.botDir
     $('#appfoot-path').textContent = state.botDir
@@ -357,6 +386,8 @@ function applyAccounts(payload) {
     state.accounts = payload
     state.nextIndex = payload.nextIndex || 1
     renderAccounts()
+    runConsole.render()
+    runConsole.refresh()
     const hint = $('#accounts-hint')
     const sessions = payload.sessions || {}
     hint.textContent = payload.envExists
@@ -418,11 +449,11 @@ function renderAccounts() {
                     ${extra.length ? `<p class="account-item__extra">${extra.map(escapeHtml).join(' · ')}</p>` : ''}
                 </div>
                 <div class="account-item__actions">
-                    <button class="mini-btn mini-btn--primary" data-act="authorize">${connected ? '重新连接' : '连接'}</button>
+                    <button class="mini-btn" data-act="run">运行此账号</button>
+                    <button class="mini-btn" data-act="authorize">${connected ? '重新登录' : '登录账号'}</button>
                     <details class="more">
                         <summary>更多</summary>
                         <div class="more__menu">
-                            <button type="button" data-act="run">运行签到</button>
                             <button type="button" data-act="edit">编辑</button>
                             <button type="button" data-act="delete">删除</button>
                         </div>
@@ -492,7 +523,7 @@ function setFormMode(account) {
     $('#form-title').textContent = account ? '编辑账号' : '添加账号'
     $('#form-lead').textContent = account
         ? '留空的密码和验证器密钥会保持原样。'
-        : '只需邮箱。保存后点「连接」，在弹出的浏览器里登录一次。'
+        : '先添加邮箱，再点「登录账号」完成微软登录，最后一键运行签到。'
     $('#btn-save .liquid-btn__text').textContent = account ? '保存修改' : '保存账号'
     $('#btn-close-form').hidden = !account && !(state.accounts?.accounts?.length)
 }
@@ -578,6 +609,11 @@ async function handleSaveAccount(event) {
 /* ────────────────────────── 授权弹窗 ────────────────────────── */
 
 function openLoginDialog(account) {
+    for (const chip of $$('#platform-picker .radio-chip')) {
+        const input = $('input', chip)
+        input.checked = input.value === 'both'
+        chip.classList.toggle('is-active', input.checked)
+    }
     state.jobEmail = account.email
     $('#dlg-login-title').textContent = `微软账号授权 · ACCOUNT_${account.index}`
     $('#dlg-login-sub').textContent = account.email
@@ -654,11 +690,11 @@ function renderJob(job) {
     const platformText = job.platform === 'both' ? '移动端 + 桌面端' : job.platform === 'desktop' ? '桌面端' : '移动端'
 
     if (job.state === 'running') {
-        textEl.textContent = `运行中 · ${platformText}${job.fresh ? ' · 全新授权' : ''}`
+        textEl.textContent = `${job.desktopUrl ? '等待你在远程窗口登录' : '运行中'} · ${platformText}${job.fresh ? ' · 全新授权' : ''}`
         $('#job-time').textContent = `开始于 ${timeOf(job.startedAt)}`
         $('#btn-stop-login').hidden = false
         $('#btn-start-login').disabled = true
-        $('.liquid-btn__text', $('#btn-start-login')).textContent = '运行中…'
+        $('.liquid-btn__text', $('#btn-start-login')).textContent = job.desktopUrl ? '等待完成登录' : '运行中…'
     } else if (job.state === 'done' || job.state === 'partial') {
         textEl.textContent = job.state === 'done' ? `授权完成 · 会话已写入 ${platformText}` : `只完成 ${job.verification?.saved.join('、') || '部分平台'}`
         $('#job-time').textContent = timeOf(job.endedAt)
@@ -706,7 +742,7 @@ function renderJobLog(lines) {
 
 async function handleStartLogin() {
     if (!state.jobEmail) return
-    const platform = $('input[name="platform"]:checked')?.value || 'mobile'
+    const platform = $('input[name="platform"]:checked')?.value || 'both'
     const fresh = $('#opt-fresh').checked
     const button = $('#btn-start-login')
     button.disabled = true
@@ -720,7 +756,7 @@ async function handleStartLogin() {
         })
         renderJob(job)
         connectJobStream(state.jobEmail)
-        toast('info', '授权已启动，请按日志提示完成微软登录')
+        toast('info', '授权已启动，请按页面提示完成微软登录')
     } catch (error) {
         if (error.status === 401) return showUnlock('会话已过期，请重新输入访问密码')
         toast('error', error.message)
@@ -770,7 +806,7 @@ function mergeJobIntoFeed(job) {
 function renderFeed() {
     const view = $('#log-view')
     const filtered = state.logFilter === 'all' ? state.feed : state.feed.filter(line => line.level === state.logFilter)
-    $('#logs-hint').textContent = `共 ${state.feed.length} 行 · 来自上游子进程与面板`
+    $('#logs-hint').textContent = `共 ${state.feed.length} 行 · 仅显示微软账号授权过程`
 
     if (!filtered.length) {
         view.innerHTML = '<div class="log-empty">暂无日志。发起一次账号授权后，这里会实时滚动显示输出。</div>'
@@ -793,14 +829,7 @@ function renderFeed() {
 /* ────────────────────────── 签到（Control API） ────────────────────────── */
 
 async function runAccount(index) {
-    try {
-        const result = await api('/api/control/start', { method: 'POST', body: { payload: index ? { accountIndex: index } : {} } })
-        toast('success', index ? `已通过签到接口启动 ACCOUNT_${index}` : '已通过签到接口启动全部账号')
-        return result
-    } catch (error) {
-        if (error.status === 401) return showUnlock('会话已过期，请重新输入访问密码')
-        toast('error', error.message)
-    }
+    return runConsole.start(index)
 }
 
 /* ────────────────────────── 主题 ────────────────────────── */
@@ -872,10 +901,11 @@ function bindEvents() {
         $('#panel-logs').hidden = active !== 'logs'
         $('#panel-settings').hidden = active !== 'settings'
         if (active === 'logs') {
+            activityPanel.open()
             openFeed()
             renderFeed()
-        }
-        if (active === 'settings') refreshState()
+        } else activityPanel.stop()
+        if (active === 'settings') { refreshState(); taskSettings.load() }
     })
 
     for (const button of [$('#btn-theme'), $('#btn-entry-theme')]) {
@@ -900,7 +930,6 @@ function bindEvents() {
         refreshAccounts()
         refreshRuns()
     })
-    $('#btn-run-all').addEventListener('click', () => runAccount(null))
 
     $('#account-list').addEventListener('click', async event => {
         const button = event.target.closest('[data-act]')

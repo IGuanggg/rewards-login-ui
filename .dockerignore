@@ -10,3 +10,4 @@ config.json
 **/*.panel.bak
 **/sessions
 **/sessions.db*
+**/activity.db*

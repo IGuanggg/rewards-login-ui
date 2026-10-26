@@ -44,6 +44,9 @@ function makeBotRepo({ sessionPath = 'sessions', withSessions = true } = {}) {
     fs.writeFileSync(path.join(BOT, 'scripts', 'utils.js'), 'export const x = 1\n')
     fs.writeFileSync(path.join(BOT, 'config.json'), JSON.stringify({ sessionPath, headless: false }, null, 4))
     fs.writeFileSync(path.join(BOT, '.env'), 'ACCOUNT_1_EMAIL=first@example.com\nACCOUNT_1_PASSWORD=pw\n')
+    fs.mkdirSync(path.join(BOT, 'dist'), { recursive: true })
+    fs.writeFileSync(path.join(BOT, 'dist/index.js'), '// Synthetic build marker; never executed\n')
+    for (const dep of ['patchright', 'fingerprint-generator', 'fingerprint-injector', 'otpauth', 'ghost-cursor-playwright-port']) fs.mkdirSync(path.join(BOT, 'node_modules', dep), { recursive: true })
     if (withSessions) {
         const dir = path.join(BOT, sessionPath)
         fs.mkdirSync(dir, { recursive: true })

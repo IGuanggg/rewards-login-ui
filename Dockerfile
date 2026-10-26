@@ -19,7 +19,7 @@ COPY --from=builder /opt/rewards/dist ./dist
 COPY --from=builder /opt/rewards/scripts ./scripts
 COPY --from=builder /opt/rewards/config.example.json ./config.example.json
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    xvfb x11vnc novnc websockify util-linux ca-certificates fonts-noto-cjk fonts-noto-color-emoji \
+    python3 xvfb x11vnc novnc websockify util-linux ca-certificates fonts-noto-cjk fonts-noto-color-emoji \
     && npx --no-install patchright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /root/.npm
 WORKDIR /opt/panel
@@ -29,5 +29,7 @@ COPY lib ./lib
 COPY docker ./docker
 # Pinned upstream compatibility change: reload edited account fields for API requests.
 RUN node docker/prepare-upstream.mjs /opt/rewards
+# Fail the build if the viewer's interpreter or either browser mode is broken.
+RUN python3 -c "import websockify" && node docker/smoke.mjs && node docker/activity-smoke.mjs
 EXPOSE 4173
 ENTRYPOINT ["node", "docker/entrypoint.mjs"]

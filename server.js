@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url'
 import { randomBytes, createHmac, timingSafeEqual, createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { createDesktopProxy } from './lib/desktop-proxy.mjs'
+import { ActivityStore, activityFile, redactLog } from './lib/activity-store.mjs'
+import { readTaskSettings, writeTaskSettings, readSchedule } from './lib/task-settings.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, 'public')
@@ -36,6 +38,8 @@ const SESSION_COOKIE = 'panel_session'
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
 const MAX_JOB_LOG = 400
 const MAX_BODY = 1_000_000
+let activityStore
+const activity = () => activityStore ||= new ActivityStore(activityFile(CONFIG_FILE))
 
 /* ────────────────────────── 基础工具 ────────────────────────── */
 
@@ -1252,9 +1256,46 @@ async function callControlApi(method, endpoint, body) {
         try {
             data = await response.json()
         } catch {}
-        return { ok: response.ok, http: response.status, data, probe }
+        return { ok: response.ok, http: response.status, data, probe,
+            ...(!response.ok ? { error: data.error || `签到服务返回 HTTP ${response.status}` } : {}) }
     } catch (error) {
         return { ok: false, http: 0, error: String(error.message || error), probe }
+    }
+}
+
+function runReadiness(accountIndex) {
+    const dir = currentBotDir()
+    const accounts = dir ? buildAccountsPayload(dir).accounts || [] : []
+    const selected = accountIndex == null ? accounts : accounts.filter(account => account.index === accountIndex)
+    if (!selected.length) return { ready: false, action: 'accounts', error: accountIndex == null ? '还没有账号，请先添加微软账号。' : '这个账号已不存在，请刷新账号列表。', accounts: accounts.length }
+    const check = preflight(dir)
+    if (!check.runReady) return { ready: false, action: 'settings', error: `签到环境未就绪：${[...new Set([...check.blocking, ...check.runBlocking])].join('、')}。请到环境与设置查看检查结果。`, accounts: accounts.length }
+    const loginRequired = selected.filter(account => !account.hasPassword && ![account.sessions.mobile, account.sessions.desktop].some(session => session?.cookies > 0))
+    return { ready: !loginRequired.length, action: 'login', accounts: accounts.length,
+        loginRequired: loginRequired.map(account => ({ index: account.index, email: account.email })),
+        error: loginRequired.length ? '有账号尚未登录，也未保存自动登录密码。请先完成账号登录，再运行签到。' : null }
+}
+
+async function controlStatus() {
+    const result = await callControlApi('GET', '/status')
+    const upstream = result.ok ? result.data : {}
+    const run = upstream.run || {}
+    const latest = activity().latest()
+    const authorization = [...jobs.values()].find(job => job.state === 'running')
+    const schedule = readSchedule(CONFIG_FILE)
+    const safe = value => redactLog(value, [state.controlToken, state.panelToken])
+    return {
+        control: result.probe,
+        state: result.ok ? upstream.state : 'unknown',
+        startedAt: upstream.startedAt || null,
+        lastExit: upstream.lastExit ? { code: upstream.lastExit.code, signal: upstream.lastExit.signal, at: upstream.lastExit.at, error: upstream.lastExit.error ? safe(upstream.lastExit.error) : null } : null,
+        run: { currentAccount: run.live?.currentAccount || null, collected: run.finished ? run.collected : null,
+            accountsTotal: run.accountsTotal ?? null, accountsDone: (run.accounts || []).filter(account => account.success != null).length,
+            pendingDelay: run.pendingDelay || null },
+        latest,
+        readiness: runReadiness(),
+        authorization: authorization ? { email: authorization.email, desktopUrl: jobView(authorization).desktopUrl, startedAt: authorization.startedAt } : null,
+        schedule: { ...schedule, enabled: REMOTE_DESKTOP && schedule.enabled, supported: REMOTE_DESKTOP }
     }
 }
 
@@ -1590,10 +1631,51 @@ const server = http.createServer(async (req, res) => {
             return json(res, 200, { ok: true })
         }
 
+        /* ── 持久化签到记录 ── */
+        if (pathname === '/api/activity' && req.method === 'GET') {
+            return json(res, 200, activity().day(url.searchParams.get('day') || undefined))
+        }
+        if (pathname === '/api/activity/run' && req.method === 'GET') {
+            return json(res, 200, activity().detail(url.searchParams.get('id') || ''))
+        }
+        if (pathname === '/api/activity/logs' && req.method === 'GET') {
+            const before = url.searchParams.has('before') ? Number(url.searchParams.get('before')) : Number.MAX_SAFE_INTEGER
+            const level = url.searchParams.get('level') || 'all'
+            if (!Number.isSafeInteger(before) || before <= 0 || !['all', 'info', 'warn', 'error', 'debug'].includes(level)) {
+                return json(res, 422, { error: '日志查询参数不正确' })
+            }
+            return json(res, 200, activity().logs(url.searchParams.get('id') || '', { before, level }))
+        }
+
         /* ── Control API ── */
+        if (pathname === '/api/task-settings' && req.method === 'GET') {
+            return json(res, 200, { ...readTaskSettings(currentBotDir(), CONFIG_FILE), schedulingSupported: REMOTE_DESKTOP })
+        }
+        if (pathname === '/api/task-settings' && req.method === 'PUT') {
+            const body = await readBody(req)
+            const settings = await guardedBrowserStart(() => writeTaskSettings(currentBotDir(), CONFIG_FILE, body, { scheduling: REMOTE_DESKTOP }))
+            return json(res, 200, { ...settings, schedulingSupported: REMOTE_DESKTOP })
+        }
+        if (pathname === '/api/control/status' && req.method === 'GET') {
+            return json(res, 200, await controlStatus())
+        }
+
         if (pathname === '/api/control/start' && req.method === 'POST') {
             const body = await readBody(req)
-            const result = await guardedBrowserStart(() => callControlApi('POST', '/start', body.payload || {}))
+            if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 422, { error: '运行参数格式不正确。' })
+            const payload = body.payload || {}
+            if (typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).some(key => key !== 'accountIndex') ||
+                (payload.accountIndex != null && (!Number.isSafeInteger(payload.accountIndex) || payload.accountIndex < 1))) {
+                return json(res, 422, { error: '运行参数不正确，请刷新页面后重试。' })
+            }
+            const probe = await probeControlApi()
+            if (probe.status !== 'online') {
+                const error = probe.status === 'unconfigured' ? '未配置签到服务，请到环境与设置连接 Control API。' : probe.status === 'unauthorized' ? '签到服务令牌无效，请到环境与设置更新令牌。' : '暂时无法连接签到服务，请检查服务状态后重试。'
+                return json(res, 503, { ok: false, error, action: 'settings', probe })
+            }
+            const readiness = runReadiness(payload.accountIndex)
+            if (!readiness.ready) return json(res, 422, { error: readiness.error, action: readiness.action, readiness })
+            const result = await guardedBrowserStart(() => callControlApi('POST', '/start', payload))
             return json(res, result.ok ? 202 : result.http || 503, result)
         }
 
@@ -1675,6 +1757,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
     const timer = setInterval(() => {
         if (![...jobs.values()].some(job => job.child) || Date.now() > deadline) {
             clearInterval(timer)
+            activityStore?.close()
             process.exit(0)
         }
     }, 100)

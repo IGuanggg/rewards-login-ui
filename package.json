@@ -12,6 +12,8 @@
         "dev": "node --watch server.js",
         "test": "node tools/acceptance.mjs",
         "test:docker": "node --test tools/docker.test.mjs",
+        "test:activity": "node --test tools/activity.test.mjs tools/activity-api.test.mjs",
+        "test:run": "node --test tools/run-console.test.mjs tools/run-api.test.mjs",
         "shots": "node tools/ui-shots.mjs"
     }
 }

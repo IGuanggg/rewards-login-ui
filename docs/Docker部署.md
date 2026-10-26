@@ -83,6 +83,7 @@ docker compose logs --tail=100 rewards
 | `data/accounts.env` | 面板保存的微软账号配置 |
 | `data/bot-config.json` | 签到配置；启动时应用无头及串行设置 |
 | `data/sessions/` | `sessions.db` 及 SQLite 辅助文件 |
+| `data/activity.db` | 最近 30 天的签到轮次、任务明细和原始日志，附带 SQLite WAL/SHM 文件 |
 
 迁移已有账号时，先停止旧签到进程，再把原上游 `.env` 复制为 `data/accounts.env`。需要迁移签到设置时，把原上游 `config.json` 复制为 `data/bot-config.json`；启动后会把 `sessionPath` 统一为 `/data/sessions`。不要把面板自身的 `config.json` 当成上游签到配置。
 
@@ -92,14 +93,16 @@ docker compose logs --tail=100 rewards
 
 ## 可选：每天定时签到
 
-在 Compose 使用的 `.env` 中填写，或在部署平台设置：
+优先在“环境与设置 → 签到设置 → 每日定时”选择时间并保存，无需重启。页面显示是否开启和实例时区。任务开关、搜索间隔和搜索词来源也可以在此保存。
+
+尚未通过面板保存定时配置时，也可在 Compose 使用的 `.env` 中填写：
 
 ```dotenv
 TZ=Asia/Shanghai
 RUN_AT=07:00
 ```
 
-再执行 `docker compose up -d`。`RUN_AT` 留空时只从面板手动启动；非空时按指定时区每天触发一次。该分钟内遇到任务占用会暂缓，整分钟都忙则当天跳过；服务器错过该分钟不会补跑。日期标记持久保存以避免重启后同日重复触发。原上游的复杂 cron 配置不由这个轻量启动器读取。
+再执行 `docker compose up -d`。通过面板保存后，`data/schedule.json` 优先于 `RUN_AT`，包括关闭定时。没有配置时默认仅手动运行。每个自然日定时触发一次；到点正在授权或签到则当天跳过，不补跑。服务器错过该分钟也不补跑。日期标记持久保存以避免重启后同日重复触发。原上游的复杂 cron 配置不由这个轻量启动器读取。
 
 ## 容器内自检
 
@@ -115,4 +118,6 @@ docker compose run --rm --no-deps --entrypoint node rewards docker/smoke.mjs
 
 本地通过：27 项面板回归、Docker 专项的配置/账号刷新/兼容补丁/HTTP 与 WebSocket 代理检查、JavaScript 语法检查、Compose 配置解析。
 
-本地 Docker CLI 已安装，但 Docker 引擎未运行，所以本次没有完成镜像构建、Linux 进程清理实测或微软账号登录实测。部署后需运行上述容器自检，再验证一次真实授权，并观察资源回收。
+2026-10-23 本地 Docker 引擎未运行，当时没有完成镜像构建或 Linux 进程清理实测。
+
+2026-10-26 已在服务器完成镜像构建、可见/无头浏览器自检、授权任务启动、真实 VNC 协议连通和终止后的进程清理检查，详见 [Docker 授权修复记录](Docker授权修复-2026-10-26.md)。微软账号最终登录和会话写入仍需用户在远程窗口完成验证。
