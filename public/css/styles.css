@@ -1683,6 +1683,10 @@ body:has(#view-app:not([hidden])) .entry-theme {
 
 .card--form {
     scroll-margin-top: 24px;
+    /* .card 的 overflow: hidden 与此处同优先级且更靠后，会覆盖 .card--form 的 overflow: auto，
+       导致弹窗内容超过 max-height 时既被裁切又无法滚动。此处显式恢复。 */
+    overflow: auto;
+    overscroll-behavior: contain;
 }
 
 .form-actions {
