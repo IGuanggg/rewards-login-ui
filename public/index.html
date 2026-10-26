@@ -6,7 +6,7 @@
         <meta name="color-scheme" content="dark light" />
         <title>Rewards 控制台</title>
         <link rel="stylesheet" href="/css/styles.css" />
-        <link rel="stylesheet" href="/css/cdk.css" />
+        <link rel="stylesheet" href="/css/dashboard.css" />
         <link
             rel="icon"
             href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2327272a'/%3E%3Cpath d='M9 20.5 14 11l4 7 5-9' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
@@ -26,9 +26,8 @@
                         </svg>
                     </div>
 
-                    <p class="unlock__eyebrow">REWARDS CONSOLE</p>
-                    <h1 class="unlock__title">欢迎回来</h1>
-                    <p class="unlock__sub">在浏览器中管理签到、账号与积分</p>
+                    <h1 class="unlock__title">Rewards 控制台</h1>
+                    <p class="unlock__sub">签到、账号与积分管理</p>
 
                     <form id="unlock-form" class="unlock__form" novalidate>
                         <label class="field">
@@ -41,11 +40,11 @@
 
                         <p class="form-error" id="unlock-error" role="alert" hidden></p>
 
-                        <button class="liquid-btn" type="submit" id="btn-unlock">
-                            <span class="liquid-btn__icon" aria-hidden="true">
+                        <button class="primary-btn" type="submit" id="btn-unlock">
+                            <span class="primary-btn__icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10.5" width="14" height="9" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 10.5V8a3.5 3.5 0 1 1 7 0v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                             </span>
-                            <span class="liquid-btn__text">进入控制台</span>
+                            <span class="primary-btn__text">进入控制台</span>
                         </button>
                     </form>
 
@@ -55,8 +54,8 @@
                     </details>
 
                     <p class="unlock__terms">
-                        继续即表示同意
-                        <button type="button" class="link-btn" data-dialog="dlg-terms">服务条款</button>
+
+                        <button type="button" class="link-btn" data-dialog="dlg-terms">使用说明</button>
                         与
                         <button type="button" class="link-btn" data-dialog="dlg-privacy">隐私说明</button>
                     </p>
@@ -89,7 +88,7 @@
                     <p class="form-error" id="setup-error" role="alert" hidden></p>
 
                     <div class="setup__actions">
-                        <button class="liquid-btn liquid-btn--solid" id="btn-setup-connect"><span class="liquid-btn__text">检查并连接</span></button>
+                        <button class="primary-btn primary-btn--full" id="btn-setup-connect"><span class="primary-btn__text">检查并连接</span></button>
                     </div>
 
                     
@@ -127,51 +126,53 @@
                 </header>
 
                 <div id="panel-dashboard" class="dashboard">
-                    <div class="dashboard-heading"><div><p class="section-kicker">REWARDS / 中国大陆</p><h1>仪表盘</h1></div><div class="dashboard-heading__actions"><span class="region-chip">中国 IP 运行</span><button class="ghost-btn ghost-btn--bordered" id="dash-refresh" type="button">刷新总览</button></div></div>
-                    <div class="dashboard-meta"><span id="dash-updated">正在读取实际运行记录…</span><span>无记录时保留空白</span></div>
+                    <header class="dashboard-heading">
+                        <div><h1>今日签到</h1><p id="dash-updated" class="muted">正在读取运行记录…</p></div>
+                        <button class="ghost-btn ghost-btn--bordered" id="dash-refresh" type="button">刷新</button>
+                    </header>
                     <p id="dash-error" class="form-error" role="status" hidden></p>
-                    <div class="stat-grid"><article class="stat-card" data-color="neutral"><span class="stat-card__label">账号总数</span><span class="stat-card__dot" aria-hidden="true"></span><strong id="dash-accounts">—</strong><p>当前实例管理的微软账号</p></article>
-<article class="stat-card" data-color="green"><span class="stat-card__label">已存会话</span><span class="stat-card__dot" aria-hidden="true"></span><strong id="dash-sessions">—</strong><p id="dash-session-note">已保存会话，实际有效性以登录结果为准</p></article>
-<article class="stat-card" data-color="blue"><span class="stat-card__label">今日确认积分</span><span class="stat-card__dot" aria-hidden="true"></span><strong id="dash-points">—</strong><p>按运行开始日期汇总 · 未确认不计入</p></article>
-<article class="stat-card" data-color="orange"><span class="stat-card__label">最近确认余额</span><span class="stat-card__dot" aria-hidden="true"></span><strong id="dash-balance">—</strong><p id="dash-balance-note">尚无余额数据</p></article>
-<article class="stat-card" data-color="red"><span class="stat-card__label">待关注任务</span><span class="stat-card__dot" aria-hidden="true"></span><strong id="dash-attention">—</strong><p>今日失败、部分完成与未完成任务</p></article>
-</div>
-                <section class="run-console" id="run-console" aria-labelledby="run-title" data-tone="idle">
-                    <div class="run-console__main">
-                        <div class="run-console__eyebrow"><span>签到工作台</span><span class="run-badge" id="run-badge" role="status">正在读取状态</span></div>
-                        <h2 id="run-title">今天的签到，从这里开始</h2>
-                        <p id="run-description">正在连接签到服务，读取账号和运行状态…</p>
-                        <div class="run-console__actions">
-                            <button class="liquid-btn liquid-btn--solid" id="btn-run-all" type="button" disabled>
-                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-                                <span class="liquid-btn__text">一键运行签到</span>
-                            </button>
-                            <button class="ghost-btn ghost-btn--bordered run-console__stop" id="btn-stop-run" type="button" hidden>停止运行</button>
-                            <button class="ghost-btn ghost-btn--bordered" id="btn-run-records" type="button">查看任务记录 <span aria-hidden="true">→</span></button>
+                    <div class="overview-metrics" aria-label="今日汇总">
+                        <div class="overview-metric overview-metric--points"><span>今日确认积分</span><strong id="dash-points">—</strong><small>按运行开始日期汇总，未确认不计入</small></div>
+                        <div class="overview-metric" id="dash-attention-metric"><span>待关注任务</span><button class="metric-link" id="dash-problems" type="button" aria-label="查看今日待关注任务"><strong id="dash-attention">—</strong><span>查看任务 →</span></button><small>今日失败、部分完成与未完成任务</small></div>
+                        <div class="overview-metric"><span>最近确认余额</span><strong id="dash-balance">—</strong><small id="dash-balance-note">尚无余额数据</small></div>
+                    </div>
+                    <section class="run-console" id="run-console" aria-labelledby="run-title" data-tone="idle">
+                        <div class="run-console__main">
+                            <div class="run-console__eyebrow"><span id="run-context">签到状态</span><span class="run-badge" id="run-badge" role="status">连接中</span></div>
+                            <h2 id="run-title">正在读取签到状态</h2>
+                            <p id="run-description">正在连接签到服务…</p>
+                            <div class="run-console__actions">
+                                <button class="primary-btn" id="btn-run-all" type="button" disabled><span class="primary-btn__text">运行签到</span><span aria-hidden="true">▶</span></button>
+                                <button class="primary-btn" id="run-next-action" type="button" hidden></button>
+                                <button class="ghost-btn ghost-btn--bordered run-console__stop" id="btn-stop-run" type="button" hidden>停止运行</button>
+                                <button class="ghost-btn" id="btn-run-records" type="button">任务记录 →</button>
+                            </div>
+                            <p class="run-console__schedule" id="run-schedule"></p>
                         </div>
-                        <p class="run-console__schedule" id="run-schedule">正在读取定时设置…</p>
-                    </div>
-                    <dl class="run-console__metrics">
-                        <div><dt>当前账号 / 最近账号</dt><dd id="run-current-account">—</dd></div>
-                        <div><dt>当前任务 / 最近结果</dt><dd id="run-current-task">—</dd></div>
-                        <div><dt>本轮耗时</dt><dd id="run-elapsed">—</dd></div>
-                        <div><dt>本轮确认积分</dt><dd id="run-earned">待确认</dd></div>
-                    </dl>
-                    <div class="run-console__guidance"><p id="run-guidance">添加账号 → 登录账号 → 一键运行签到。</p><button class="ghost-btn ghost-btn--bordered" id="run-next-action" type="button" hidden></button></div>
-                </section>
-
-
+                        <dl class="run-console__metrics">
+                            <div><dt>当前 / 最近账号</dt><dd id="run-current-account">—</dd></div>
+                            <div><dt>当前任务 / 最近结果</dt><dd id="run-current-task">—</dd></div>
+                            <div><dt>本轮耗时</dt><dd id="run-elapsed">—</dd></div>
+                            <div><dt>本轮确认积分</dt><dd id="run-earned">待确认</dd></div>
+                        </dl>
+                        <div class="run-console__guidance" id="run-guidance-wrap" hidden><p id="run-guidance"></p></div>
+                        <section class="run-issues" id="run-issues" aria-labelledby="run-issues-title" hidden><h3 id="run-issues-title">本轮需处理</h3><ul id="run-issues-list"></ul></section>
+                    </section>
+                    <section class="dashboard-section" aria-labelledby="dash-account-title">
+                        <div class="dashboard-section__head"><div><h2 id="dash-account-title">账号积分</h2><p class="muted"><span id="dash-accounts">—</span> 个账号 · <span id="dash-sessions">—</span> 个已存会话<span class="session-caveat">（有效性以登录结果为准）</span></p></div><button class="ghost-btn ghost-btn--bordered" id="dash-manage-accounts" type="button">管理账号 →</button></div>
+                        <div class="activity-table-wrap" tabindex="0" aria-label="账号积分明细，可横向滚动"><table class="activity-table"><thead><tr><th>微软账号</th><th>会话</th><th>今日确认积分</th><th>最近余额</th><th>余额上报时间</th></tr></thead><tbody id="dash-account-body"></tbody></table></div>
+                        <p class="table-note">余额为最近上报值，非实时查询。</p>
+                    </section>
                     <div class="dashboard-grid">
-                        <section class="dashboard-card"><div class="dashboard-card__head"><h2>近 14 天积分趋势</h2><span class="muted">确认积分 / 分</span></div><div id="dash-trend" class="dashboard-chart"><p class="muted">读取中…</p></div><details class="chart-data"><summary>查看每日数据</summary><table class="activity-table"><thead><tr><th>日期</th><th>确认积分</th><th>运行次数</th></tr></thead><tbody id="dash-trend-table"></tbody></table></details></section>
-                        <section class="dashboard-card"><div class="dashboard-card__head"><h2>运行环境</h2><span class="region-chip">CN</span></div><dl class="environment-list"><div><dt>搜索词来源</dt><dd id="dash-source">—</dd></div><div><dt>下一次定时</dt><dd id="dash-next">—</dd></div><div><dt>最近定时结果</dt><dd id="dash-schedule-last">—</dd></div><div><dt>当前版本</dt><dd id="dash-version">—</dd></div><div><dt>运行方式</dt><dd>账号依次执行 · 浏览器按需启动</dd></div></dl></section>
+                        <section class="dashboard-section"><div class="dashboard-section__head"><h2>近 14 天积分</h2><span class="muted">确认积分 / 分</span></div><div id="dash-trend" class="dashboard-chart"><p class="muted">读取中…</p></div><details class="chart-data"><summary>每日数据</summary><div class="activity-table-wrap"><table class="activity-table"><thead><tr><th>日期</th><th>确认积分</th><th>运行次数</th></tr></thead><tbody id="dash-trend-table"></tbody></table></div></details></section>
+                        <section class="dashboard-section"><div class="dashboard-section__head"><h2>运行环境</h2></div><dl class="environment-list"><div><dt>搜索词来源</dt><dd id="dash-source">—</dd></div><div><dt>下一次定时</dt><dd id="dash-next">—</dd></div><div><dt>最近定时结果</dt><dd id="dash-schedule-last">—</dd></div><div><dt>当前版本</dt><dd id="dash-version">—</dd></div><div><dt>运行方式</dt><dd>账号依次执行</dd></div></dl></section>
                     </div>
-                    <section class="dashboard-card"><div class="dashboard-card__head"><h2>账号积分明细</h2><span class="muted">余额取最近一次上报，非实时查询</span></div><div class="activity-table-wrap" tabindex="0" aria-label="账号积分明细，可横向滚动"><table class="activity-table"><thead><tr><th>微软账号</th><th>会话</th><th>今日确认积分</th><th>最近余额</th><th>余额上报时间</th></tr></thead><tbody id="dash-account-body"></tbody></table></div></section>
                 </div>
                 <div class="panel-grid" id="panel-accounts" hidden>
                     <div class="workspace-heading">
                         <div>
                             <h1>账号与授权</h1>
-                            <p>管理你的微软账号，随时查看已保存的登录状态。</p>
+                            <p>添加账号、保存会话或重新登录。</p>
                         </div>
                         <a class="ghost-btn ghost-btn--bordered workspace-heading__action" id="btn-add-account" href="#account-editor">添加账号 <span aria-hidden="true">＋</span></a>
                     </div>
@@ -192,8 +193,8 @@
                             <ul class="account-list" id="account-list"></ul>
                             <div class="empty-state" id="accounts-empty" hidden>
                                 <p class="empty-state__title">还没有微软账号</p>
-                                <p class="muted">登录状态会保存，无需重复填写</p>
-                                <button class="liquid-btn" type="button" id="btn-empty-add">添加账号</button>
+                                <p class="muted">添加邮箱后登录一次，之后无需重复登录。</p>
+                                <button class="primary-btn" type="button" id="btn-empty-add">添加账号</button>
                             </div>
                         </section>
 
@@ -214,7 +215,7 @@
                         <div class="card__head">
                             <div>
                                 <h2 id="form-title">添加微软账号</h2>
-                                <p class="muted" id="form-lead"></p>
+                                <p class="muted" id="form-lead">填写邮箱后，登录一次以保存会话。</p>
                             </div>
                             <button class="icon-btn form-close" id="btn-close-form" type="button" aria-label="关闭" hidden>
                                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -304,8 +305,8 @@
                             <p class="form-error" id="form-error" role="alert" hidden></p>
 
                             <div class="form-actions">
-                                <button class="liquid-btn liquid-btn--solid" type="submit" id="btn-save">
-                                    <span class="liquid-btn__text">保存账号</span>
+                                <button class="primary-btn primary-btn--full" type="submit" id="btn-save">
+                                    <span class="primary-btn__text">保存账号</span>
                                 </button>
                                 <button class="ghost-btn ghost-btn--bordered" type="button" id="btn-reset">清空</button>
                             </div>
@@ -324,7 +325,7 @@
                         <div class="card__head">
                             <div>
                                 <h2 id="activity-title">签到任务记录</h2>
-                                <p>查看每天运行了哪些任务、执行结果和获得的积分。</p>
+                                <p>按日期查看任务结果与确认积分。</p>
                             </div>
                             <div class="card__head-actions activity-controls">
                                 <label>运行日期<input type="date" id="activity-day" /></label>
@@ -341,7 +342,7 @@
                         <p class="activity-note" id="activity-note" role="status"></p>
                         <div class="activity-empty" id="activity-empty" hidden>
                             <strong>这一天还没有签到记录</strong>
-                            <p>从「账号授权」页运行签到后，这里会自动显示任务与结果。</p>
+                            <p>从「总览」运行签到后，这里会显示记录。</p>
                         </div>
                         <div class="activity-detail" id="activity-detail" hidden>
                             <div class="activity-run-picker">
@@ -395,7 +396,7 @@
 
                 <div class="panel-single" id="panel-settings" hidden>
                     <section class="card">
-                        <div class="card__head"><div><h2>签到设置</h2></div><button class="ghost-btn ghost-btn--bordered" type="button" id="task-settings-reload">重新读取</button></div>
+                        <div class="card__head"><div><h2>签到设置</h2><p>任务开关、间隔与每日定时。</p></div><button class="ghost-btn ghost-btn--bordered" type="button" id="task-settings-reload">重新读取</button></div>
                         <form id="task-settings-form" class="task-settings-form">
                             <fieldset id="task-settings-fields" disabled>
                                 <legend>要运行哪些任务</legend>
@@ -434,7 +435,7 @@
                         <div class="card__head">
                             <div>
                                 <h2>环境与设置</h2>
-                                
+                                <p class="muted">管理面板访问、授权环境与签到接口。</p>
                             </div>
                         </div>
 
@@ -530,7 +531,7 @@
                     <div class="remote-browser" id="remote-browser" role="status" hidden>
                         <strong>下一步：打开远程浏览器</strong>
                         <p>浏览器已启动，正在等待你完成微软登录。点击下方按钮，在新窗口输入账号信息或完成验证。</p>
-                        <a class="liquid-btn liquid-btn--solid" id="remote-browser-link" target="_blank" rel="noopener"><span class="liquid-btn__text">打开远程浏览器 ↗</span></a>
+                        <a class="primary-btn primary-btn--full" id="remote-browser-link" target="_blank" rel="noopener"><span class="primary-btn__text">打开远程浏览器 ↗</span></a>
                         <p class="remote-browser__note">会先后打开移动端和桌面端登录窗口，完成后自动保存会话。</p>
                     </div>
                     <ul class="verify-list" id="verify-list" hidden></ul>
@@ -540,7 +541,7 @@
 
                 <footer class="dialog__foot">
                     <button class="ghost-btn ghost-btn--bordered" id="btn-stop-login" hidden>终止</button>
-                    <button class="liquid-btn liquid-btn--solid" id="btn-start-login"><span class="liquid-btn__text">启动浏览器授权</span></button>
+                    <button class="primary-btn primary-btn--full" id="btn-start-login"><span class="primary-btn__text">启动浏览器授权</span></button>
                 </footer>
             </div>
         </dialog>
@@ -549,7 +550,7 @@
         <dialog class="dialog" id="dlg-terms">
             <div class="dialog__inner">
                 <header class="dialog__head">
-                    <h3>服务条款</h3>
+                    <h3>使用说明</h3>
                     <button class="icon-btn" data-close-dialog aria-label="关闭"><svg viewBox="0 0 24 24" fill="none"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
                 </header>
                 <div class="dialog__body prose">

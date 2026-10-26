@@ -38,7 +38,7 @@ const timeOf = ts => (ts ? new Date(Number(ts)).toLocaleTimeString('zh-CN', { ho
 const dashboard = createDashboard({ api, escapeHtml, onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码') })
 const notifications = createNotifications({ api, onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码') })
 const activityPanel = createActivityPanel({ api, escapeHtml, timeOf, onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码') })
-const runConsole = createRunConsole({ api,
+const runConsole = createRunConsole({ api, escapeHtml,
     onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码'),
     onStart: index => { activityPanel.today(); toast('success', index == null ? '已提交全部账号签到，运行进度会自动更新' : '已提交该账号签到，运行进度会自动更新') },
     onAction: (action, email, info) => {
@@ -123,10 +123,10 @@ function confirmDialog({ title, message, confirmText = '确认', danger = false 
                 <div class="dialog__body prose"><p>${escapeHtml(message)}</p></div>
                 <footer class="dialog__foot">
                     <button class="ghost-btn ghost-btn--bordered" data-act="cancel">取消</button>
-                    <button class="liquid-btn liquid-btn--solid" data-act="ok" style="min-width:120px"><span class="liquid-btn__text">${escapeHtml(confirmText)}</span></button>
+                    <button class="primary-btn primary-btn--full" data-act="ok" style="min-width:120px"><span class="primary-btn__text">${escapeHtml(confirmText)}</span></button>
                 </footer>
             </div>`
-        if (danger) $('[data-act="ok"]', dialog).style.background = 'linear-gradient(135deg, oklch(0.6 0.21 22), oklch(0.68 0.18 40))'
+        if (danger) $('[data-act="ok"]', dialog).style.background = 'var(--danger)'
         document.body.appendChild(dialog)
         dialog.addEventListener('click', event => {
             const act = event.target.closest('[data-act]')?.dataset.act
@@ -209,7 +209,7 @@ async function handleUnlock(event) {
 
     button.disabled = true
     button.classList.add('is-loading')
-    $('.liquid-btn__text', button).textContent = '验证中…'
+    $('.primary-btn__text', button).textContent = '验证中…'
 
     try {
         await api('/api/auth/login', { method: 'POST', body: { token } })
@@ -223,7 +223,7 @@ async function handleUnlock(event) {
     } finally {
         button.disabled = false
         button.classList.remove('is-loading')
-        $('.liquid-btn__text', button).textContent = '进入控制台'
+        $('.primary-btn__text', button).textContent = '进入控制台'
     }
 }
 
@@ -291,7 +291,7 @@ async function handleConnect() {
     }
 
     button.disabled = true
-    $('.liquid-btn__text', button).textContent = '检查中…'
+    $('.primary-btn__text', button).textContent = '检查中…'
 
     try {
         const check = await runPreflight(dir)
@@ -315,7 +315,7 @@ async function handleConnect() {
         errorEl.hidden = false
     } finally {
         button.disabled = false
-        $('.liquid-btn__text', button).textContent = '检查并连接'
+        $('.primary-btn__text', button).textContent = '检查并连接'
     }
 }
 
@@ -530,8 +530,8 @@ function setFormMode(account) {
     $('#form-title').textContent = account ? '编辑账号' : '添加账号'
     $('#form-lead').textContent = account
         ? '留空的密码和验证器密钥会保持原样。'
-        : '先添加邮箱，再点「登录账号」完成微软登录，最后一键运行签到。'
-    $('#btn-save .liquid-btn__text').textContent = account ? '保存修改' : '保存账号'
+        : '填写邮箱后，登录一次以保存会话。'
+    $('#btn-save .primary-btn__text').textContent = account ? '保存修改' : '保存账号'
     $('#btn-close-form').hidden = !account && !(state.accounts?.accounts?.length)
 }
 
@@ -595,7 +595,7 @@ async function handleSaveAccount(event) {
     }
 
     button.disabled = true
-    $('.liquid-btn__text', button).textContent = '保存中…'
+    $('.primary-btn__text', button).textContent = '保存中…'
 
     try {
         const payload = await api('/api/accounts', { method: 'POST', body })
@@ -609,7 +609,7 @@ async function handleSaveAccount(event) {
         errorEl.hidden = false
     } finally {
         button.disabled = false
-        $('.liquid-btn__text', button).textContent = state.editingIndex ? '保存修改' : '保存账号'
+        $('.primary-btn__text', button).textContent = state.editingIndex ? '保存修改' : '保存账号'
     }
 }
 
@@ -633,7 +633,7 @@ function openLoginDialog(account) {
     $('#verify-list').hidden = true
     $('#btn-stop-login').hidden = true
     $('#btn-start-login').disabled = false
-    $('.liquid-btn__text', $('#btn-start-login')).textContent = '启动浏览器授权'
+    $('.primary-btn__text', $('#btn-start-login')).textContent = '启动浏览器授权'
     $('#dlg-login').showModal()
 
     // 已有任务则接管显示
@@ -701,13 +701,13 @@ function renderJob(job) {
         $('#job-time').textContent = `开始于 ${timeOf(job.startedAt)}`
         $('#btn-stop-login').hidden = false
         $('#btn-start-login').disabled = true
-        $('.liquid-btn__text', $('#btn-start-login')).textContent = job.desktopUrl ? '等待完成登录' : '运行中…'
+        $('.primary-btn__text', $('#btn-start-login')).textContent = job.desktopUrl ? '等待完成登录' : '运行中…'
     } else if (job.state === 'done' || job.state === 'partial') {
         textEl.textContent = job.state === 'done' ? `授权完成 · 会话已写入 ${platformText}` : `只完成 ${job.verification?.saved.join('、') || '部分平台'}`
         $('#job-time').textContent = timeOf(job.endedAt)
         $('#btn-stop-login').hidden = true
         $('#btn-start-login').disabled = false
-        $('.liquid-btn__text', $('#btn-start-login')).textContent = '再次授权'
+        $('.primary-btn__text', $('#btn-start-login')).textContent = '再次授权'
         closeJobStream()
         refreshAccounts()
         refreshRuns()
@@ -721,7 +721,7 @@ function renderJob(job) {
         $('#job-time').textContent = timeOf(job.endedAt)
         $('#btn-stop-login').hidden = true
         $('#btn-start-login').disabled = false
-        $('.liquid-btn__text', $('#btn-start-login')).textContent = '重试'
+        $('.primary-btn__text', $('#btn-start-login')).textContent = '重试'
         closeJobStream()
         refreshRuns()
     }
@@ -895,6 +895,9 @@ function bindEvents() {
             button.textContent = show ? '隐藏' : '显示'
         })
     }
+
+    $('#dash-manage-accounts').addEventListener('click', () => $('#tabs [data-tab="accounts"]').click())
+    $('#dash-problems').addEventListener('click', () => { activityPanel.today(); $('#tabs [data-tab="logs"]').click() })
 
     $('#tabs').addEventListener('click', event => {
         const tab = event.target.closest('.tab')
@@ -1079,13 +1082,6 @@ function bindEvents() {
     $('#btn-clear-logs').addEventListener('click', () => {
         state.feed = []
         renderFeed()
-    })
-
-    document.addEventListener('pointermove', event => {
-        const button = event.target.closest?.('.liquid-btn')
-        if (!button) return
-        const rect = button.getBoundingClientRect()
-        button.style.setProperty('--mx', `${((event.clientX - rect.left) / rect.width) * 100}%`)
     })
 }
 
