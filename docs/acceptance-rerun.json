@@ -1,8 +1,8 @@
 {
-  "date": "2026-10-26",
-  "sandbox": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-GJ79bY",
-  "total": 27,
-  "passed": 27,
+  "date": "2026-11-26",
+  "sandbox": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-FSPiGF",
+  "total": 30,
+  "passed": 30,
   "failed": 0,
   "results": [
     {
@@ -109,7 +109,7 @@
         "exists": true,
         "configured": "custom_sessions",
         "mobile": {
-          "updatedAt": 1792984080186,
+          "updatedAt": 1795681653593,
           "cookies": 0
         }
       }
@@ -140,14 +140,14 @@
             {
               "platform": "mobile",
               "fresh": true,
-              "updatedAt": 1792984080706,
-              "previous": 1792984080186,
+              "updatedAt": 1795681654060,
+              "previous": 1795681653593,
               "cookies": 2,
               "reason": null
             }
           ],
-          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-GJ79bY\\bot\\custom_sessions\\sessions.db",
-          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-GJ79bY\\bot\\custom_sessions\\sessions.db",
+          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-FSPiGF\\bot\\custom_sessions\\sessions.db",
+          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-FSPiGF\\bot\\custom_sessions\\sessions.db",
           "error": null
         }
       }
@@ -170,8 +170,8 @@
             {
               "platform": "mobile",
               "fresh": true,
-              "updatedAt": 1792984080937,
-              "previous": 1792984080706,
+              "updatedAt": 1795681654330,
+              "previous": 1795681654060,
               "cookies": 1,
               "reason": null
             },
@@ -184,8 +184,8 @@
               "reason": null
             }
           ],
-          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-GJ79bY\\bot\\custom_sessions\\sessions.db",
-          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-GJ79bY\\bot\\custom_sessions\\sessions.db",
+          "dbPath": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-FSPiGF\\bot\\custom_sessions\\sessions.db",
+          "expected": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-FSPiGF\\bot\\custom_sessions\\sessions.db",
           "error": null
         }
       }
@@ -235,7 +235,7 @@
       "expected": "未配置 → 503 并说明",
       "actual": {
         "http": 503,
-        "error": "未配置 Control API，无法执行签到任务"
+        "error": "未配置签到服务，请到环境与设置连接 Control API。"
       }
     },
     {
@@ -251,8 +251,8 @@
       "status": "PASS",
       "expected": "重启面板后会话仍在且时间戳一致",
       "actual": {
-        "before": 1792984080937,
-        "after": 1792984080937
+        "before": 1795681654330,
+        "after": 1795681654330
       }
     },
     {
@@ -261,8 +261,8 @@
       "expected": "再次授权刷新 updated_at",
       "actual": {
         "state": "done",
-        "before": 1792984080937,
-        "after": 1792984084622
+        "before": 1795681654330,
+        "after": 1795681658006
       }
     },
     {
@@ -308,16 +308,68 @@
       "status": "PASS",
       "expected": "检查 B 时返回 B，且缺少 sessionPath 不算授权就绪",
       "actual": {
-        "botDir": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-GJ79bY\\other-bot",
+        "botDir": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-FSPiGF\\other-bot",
         "authorizeReady": false,
         "config": {
           "id": "config",
           "label": "授权配置",
           "ok": false,
-          "detail": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-GJ79bY\\other-bot\\config.json 缺少 sessionPath，手动授权会直接退出。请从 config.example.json 复制一份并填写 sessionPath",
+          "detail": "C:\\Users\\无敌大~1\\AppData\\Local\\Temp\\panel-acc-FSPiGF\\other-bot\\config.json 缺少 sessionPath，手动授权会直接退出。请从 config.example.json 复制一份并填写 sessionPath",
           "fatal": true,
           "scope": "authorize"
         }
+      }
+    },
+    {
+      "id": "malformed_cookie_does_not_500",
+      "status": "PASS",
+      "expected": "畸形 Cookie 不会 500，且不影响同请求的有效会话",
+      "actual": {
+        "authState": 200,
+        "authenticated": false,
+        "unauth": 401,
+        "badSession": 401,
+        "mixedValid": 200
+      }
+    },
+    {
+      "id": "control_token_preserved_and_cleared_explicitly",
+      "status": "PASS",
+      "expected": "留空不传时保留 Control API 令牌；显式 clearControlToken 时清空",
+      "actual": {
+        "first": {
+          "status": "online",
+          "has": true
+        },
+        "stateHas": true,
+        "second": {
+          "status": "online",
+          "has": true
+        },
+        "cleared": {
+          "status": "unauthorized",
+          "has": false
+        }
+      }
+    },
+    {
+      "id": "create_account_omitting_index_allocates_safely",
+      "status": "PASS",
+      "expected": "不传 index 顺序分配新序号，不覆盖旧账号也不继承凭据，非法序号 422",
+      "actual": {
+        "statuses": [
+          201,
+          201,
+          201,
+          422
+        ],
+        "indices": [
+          2,
+          3,
+          4
+        ],
+        "keepSecret": true,
+        "noLeak": true
       }
     }
   ]

@@ -58,7 +58,7 @@ export function createActivityPanel({ api, escapeHtml: esc, timeOf, onUnauthoriz
             $('#activity-task-list').innerHTML = tasks.length ? tasks.map(task => `<tr>
                 <td>${timeOf(task.startedAt)}</td><td class="activity-account">${esc(task.account || '—')}</td>
                 <td><strong>${esc(task.label)}</strong><small>${esc(task.message)}</small></td>
-                <td>${esc(PLATFORMS[task.platform] || task.platform)}</td><td>${statusTag(task.state)}</td><td>${task.points ?? '—'}</td></tr>`).join('')
+                <td>${esc(PLATFORMS[task.platform] || task.platform)}</td><td>${statusTag(task.state)}</td><td class="num">${task.points ?? '—'}</td></tr>`).join('')
                 : '<tr><td colspan="6" class="activity-table-empty">尚未收到任务明细。启动检查和报错可以在原始日志中查看。</td></tr>'
         }
         const revision = `${id}:${run.revision}:${run.state}:${$('#activity-log-level').value}`

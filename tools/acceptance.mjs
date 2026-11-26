@@ -88,10 +88,11 @@ function writeLoginScript(mode) {
 
 /* ── HTTP ── */
 
-async function call(pathname, { method = 'GET', body, auth = true, raw = false } = {}) {
+async function call(pathname, { method = 'GET', body, auth = true, raw = false, cookieHeader } = {}) {
     const headers = {}
     if (body) headers['Content-Type'] = 'application/json'
-    if (auth && cookie) headers.Cookie = cookie
+    if (cookieHeader !== undefined) headers.Cookie = cookieHeader
+    else if (auth && cookie) headers.Cookie = cookie
     const response = await fetch(`${BASE}${pathname}`, {
         method,
         headers,
@@ -587,6 +588,122 @@ console.log('[SUCCESS] Saved desktop session')
         )
     }
 
+    /* 25. 畸形 Cookie 不能导致 500，也不能阻断同请求里的有效会话 Cookie */
+    {
+        const authState = await call('/api/auth/state', { cookieHeader: 'other_app=%E0%A4%A' })
+        const unauth = await call('/api/accounts', { cookieHeader: 'other_app=%E0%A4%A' })
+        const badSession = await call('/api/accounts', { cookieHeader: 'panel_session=%E0%A4%A' })
+        const mixedValid = await call('/api/accounts', { cookieHeader: `other_app=%E0%A4%A; ${cookie}` })
+        record(
+            'malformed_cookie_does_not_500',
+            authState.status === 200 &&
+                authState.data.authenticated === false &&
+                unauth.status === 401 &&
+                badSession.status === 401 &&
+                mixedValid.status === 200,
+            '畸形 Cookie 不会 500，且不影响同请求的有效会话',
+            {
+                authState: authState.status,
+                authenticated: authState.data.authenticated,
+                unauth: unauth.status,
+                badSession: badSession.status,
+                mixedValid: mixedValid.status
+            }
+        )
+    }
+
+    /* 26. Control API 令牌：不传则保留，显式 clearControlToken 才清空 */
+    {
+        const secret = 'ctrl-secret-keep-me'
+        const fake = await startControlApi(18012, 200, secret)
+        try {
+            const first = await call('/api/config', {
+                method: 'PUT',
+                body: { controlApi: 'http://127.0.0.1:18012', controlToken: secret }
+            })
+            const stateAfterFirst = await call('/api/state')
+            // 模拟第二次点「保存并测试」且留空令牌：不提交 controlToken 字段
+            const second = await call('/api/config', {
+                method: 'PUT',
+                body: { controlApi: 'http://127.0.0.1:18012' }
+            })
+            const cleared = await call('/api/config', {
+                method: 'PUT',
+                body: { controlApi: 'http://127.0.0.1:18012', clearControlToken: true }
+            })
+            await call('/api/config', { method: 'PUT', body: { controlApi: '', clearControlToken: true } })
+            record(
+                'control_token_preserved_and_cleared_explicitly',
+                first.status === 200 &&
+                    first.data.control?.status === 'online' &&
+                    first.data.hasControlToken === true &&
+                    stateAfterFirst.data.hasControlToken === true &&
+                    second.status === 200 &&
+                    second.data.control?.status === 'online' &&
+                    second.data.hasControlToken === true &&
+                    cleared.status === 200 &&
+                    cleared.data.hasControlToken === false &&
+                    cleared.data.control?.status === 'unauthorized',
+                '留空不传时保留 Control API 令牌；显式 clearControlToken 时清空',
+                {
+                    first: { status: first.data.control?.status, has: first.data.hasControlToken },
+                    stateHas: stateAfterFirst.data.hasControlToken,
+                    second: { status: second.data.control?.status, has: second.data.hasControlToken },
+                    cleared: { status: cleared.data.control?.status, has: cleared.data.hasControlToken }
+                }
+            )
+        } finally {
+            fake.kill()
+        }
+    }
+
+    /* 27. 新增账号不传 index 时由服务端分配新序号，不得覆盖已有账号或继承其凭据 */
+    {
+        const existing = await call('/api/accounts', {
+            method: 'POST',
+            body: { email: 'existing@example.com', password: 'keep-me-secret', totpSecret: 'JBSWY3DPEHPK3PXP' }
+        })
+        const created1 = await call('/api/accounts', {
+            method: 'POST',
+            body: { email: 'auto1@example.com' }
+        })
+        const created2 = await call('/api/accounts', {
+            method: 'POST',
+            body: { email: 'auto2@example.com' }
+        })
+        const badIndex = await call('/api/accounts', {
+            method: 'POST',
+            body: { index: -1, email: 'badidx@example.com' }
+        })
+        const env = fs.readFileSync(path.join(BOT, '.env'), 'utf8')
+        const idxExist = existing.data.index
+        const idx1 = created1.data.index
+        const idx2 = created2.data.index
+        const keepSecret = env.includes(`ACCOUNT_${idxExist}_EMAIL=existing@example.com`) &&
+            env.includes(`ACCOUNT_${idxExist}_PASSWORD=keep-me-secret`)
+        const noLeak = !env.includes(`ACCOUNT_${idx1}_PASSWORD=`) &&
+            env.includes(`ACCOUNT_${idx1}_EMAIL=auto1@example.com`) &&
+            env.includes(`ACCOUNT_${idx2}_EMAIL=auto2@example.com`)
+        record(
+            'create_account_omitting_index_allocates_safely',
+            existing.status === 201 &&
+                created1.status === 201 &&
+                created2.status === 201 &&
+                idx1 > idxExist &&
+                idx2 > idx1 &&
+                badIndex.status === 422 &&
+                keepSecret &&
+                noLeak,
+            '不传 index 顺序分配新序号，不覆盖旧账号也不继承凭据，非法序号 422',
+            {
+                statuses: [existing.status, created1.status, created2.status, badIndex.status],
+                indices: [idxExist, idx1, idx2],
+                keepSecret,
+                noLeak
+            }
+        )
+    }
+
     /* 汇总 */
     const failed = results.filter(r => r.status === 'FAIL')
     const summary = {
@@ -604,14 +721,16 @@ console.log('[SUCCESS] Saved desktop session')
     return summary.failed === 0
 }
 
-/* 假的 Control API：按指定状态码响应 /health */
-function startControlApi(port, healthStatus) {
+/* 假的 Control API：按指定状态码（及可选令牌）响应 /health */
+function startControlApi(port, healthStatus, expectedToken = null) {
     return new Promise(resolve => {
         import('node:http').then(({ default: http }) => {
             const srv = http.createServer((req, res) => {
                 if (req.url === '/health') {
-                    res.writeHead(healthStatus, { 'Content-Type': 'application/json' })
-                    return res.end(JSON.stringify(healthStatus === 200 ? { ok: true, state: 'idle' } : { error: 'Unauthorized' }))
+                    const authed = !expectedToken || req.headers.authorization === `Bearer ${expectedToken}`
+                    const status = authed ? healthStatus : 401
+                    res.writeHead(status, { 'Content-Type': 'application/json' })
+                    return res.end(JSON.stringify(status === 200 ? { ok: true, state: 'idle' } : { error: 'Unauthorized' }))
                 }
                 if (req.url === '/start' || req.url === '/stop') {
                     res.writeHead(202, { 'Content-Type': 'application/json' })

@@ -20,9 +20,9 @@ const state = {
     botDir: '',
     control: null,
     accounts: null,
-    nextIndex: 1,
     editingIndex: null,
     jobEmail: null,
+    jobRunning: false,
     jobStream: null,
     logFilter: 'all',
     feedStream: null,
@@ -123,10 +123,9 @@ function confirmDialog({ title, message, confirmText = '确认', danger = false 
                 <div class="dialog__body prose"><p>${escapeHtml(message)}</p></div>
                 <footer class="dialog__foot">
                     <button class="ghost-btn ghost-btn--bordered" data-act="cancel">取消</button>
-                    <button class="liquid-btn liquid-btn--solid" data-act="ok" style="min-width:120px"><span class="liquid-btn__text">${escapeHtml(confirmText)}</span></button>
+                    <button class="liquid-btn liquid-btn--solid${danger ? ' liquid-btn--danger' : ''}" data-act="ok" style="min-width:110px"><span class="liquid-btn__text">${escapeHtml(confirmText)}</span></button>
                 </footer>
             </div>`
-        if (danger) $('[data-act="ok"]', dialog).style.background = 'linear-gradient(135deg, oklch(0.6 0.21 22), oklch(0.68 0.18 40))'
         document.body.appendChild(dialog)
         dialog.addEventListener('click', event => {
             const act = event.target.closest('[data-act]')?.dataset.act
@@ -360,6 +359,16 @@ async function refreshState() {
         note.textContent = map[status] || '—'
         note.dataset.tone = status === 'online' ? 'ok' : status === 'unconfigured' ? 'muted' : 'bad'
 
+        const hasControlToken = Boolean(info.hasControlToken)
+        const tokenInput = $('#s-control-token')
+        if (tokenInput) {
+            tokenInput.placeholder = hasControlToken ? '已保存，留空保留；填写可替换' : '填入上游 API_TOKEN（可选）'
+        }
+        const clearWrap = $('#s-control-token-clear-wrap')
+        const clearBox = $('#s-control-token-clear')
+        if (clearWrap) clearWrap.hidden = !hasControlToken
+        if (clearBox && !hasControlToken) clearBox.checked = false
+
         $('#s-auth-note').textContent = info.authRequired
             ? '已启用访问密码；修改后需重新登录。'
             : '⚠ 已用 PANEL_NO_AUTH 关闭鉴权，任何能访问本端口的人都能读写账号配置。'
@@ -391,7 +400,6 @@ async function refreshState() {
 function applyAccounts(payload) {
     if (!payload || payload.ok === false) return
     state.accounts = payload
-    state.nextIndex = payload.nextIndex || 1
     renderAccounts()
     runConsole.render()
     runConsole.refresh()
@@ -421,9 +429,12 @@ async function refreshAccounts() {
     }
 }
 
-function sessionPhrase(label, session) {
-    if (!session) return `${label}未连接`
-    return `${label}已保存 · ${ago(session.updatedAt)}`
+function sessionBadge(label, session) {
+    if (!session) {
+        return `<span class="session-chip" data-ok="false"><i></i>${label} · 未连接</span>`
+    }
+    const detail = session.updatedAt ? ago(session.updatedAt) : `${session.cookies ?? 0} cookies`
+    return `<span class="session-chip" data-ok="true" title="${label}已保存 · ${session.cookies ?? '?'} cookies"><i></i>${label} · ${escapeHtml(detail)}</span>`
 }
 
 function renderAccounts() {
@@ -440,29 +451,35 @@ function renderAccounts() {
 
     list.innerHTML = accounts
         .map(account => {
-            const summary = [sessionPhrase('手机', account.sessions?.mobile), sessionPhrase('电脑', account.sessions?.desktop)].join(' · ')
-            const connected = Boolean(account.sessions?.mobile || account.sessions?.desktop)
+            const hasMobile = Boolean(account.sessions?.mobile?.cookies)
+            const hasDesktop = Boolean(account.sessions?.desktop?.cookies)
+            const connected = hasMobile || hasDesktop
             const extra = [
-                account.hasPassword ? '已保存密码' : '',
-                account.hasTotp ? '双重验证' : '',
-                account.hasProxy ? '使用代理' : ''
+                account.hasPassword ? '已存密码' : '',
+                account.hasTotp ? '2FA' : '',
+                account.hasProxy ? '代理' : ''
             ].filter(Boolean)
 
             return `<li class="account-item" data-index="${account.index}" data-email="${escapeHtml(account.email)}">
-                <span class="avatar" aria-hidden="true">${escapeHtml((account.email || '?').slice(0, 1))}</span>
+                <span class="avatar" aria-hidden="true">${escapeHtml((account.email || '?').slice(0, 1).toUpperCase())}</span>
                 <div class="account-item__main">
-                    <div class="account-item__email" title="${escapeHtml(account.email)}">${escapeHtml(account.email)}</div>
-                    <p class="account-item__summary">${escapeHtml(summary)}</p>
-                    ${extra.length ? `<p class="account-item__extra">${extra.map(escapeHtml).join(' · ')}</p>` : ''}
+                    <div class="account-item__head">
+                        <div class="account-item__email" title="${escapeHtml(account.email)}">${escapeHtml(account.email)}</div>
+                        ${extra.map(label => `<span class="meta-chip">${escapeHtml(label)}</span>`).join('')}
+                    </div>
+                    <div class="account-item__sessions">
+                        ${sessionBadge('手机端', account.sessions?.mobile)}
+                        ${sessionBadge('电脑端', account.sessions?.desktop)}
+                    </div>
                 </div>
                 <div class="account-item__actions">
-                    <button class="mini-btn" data-act="run">运行此账号</button>
-                    <button class="mini-btn" data-act="authorize">${connected ? '重新登录' : '登录账号'}</button>
+                    <button class="mini-btn" data-act="run">运行签到</button>
+                    <button class="mini-btn mini-btn--accent" data-act="authorize">${connected ? (hasMobile && hasDesktop ? '重新登录' : '补全登录') : '登录账号'}</button>
                     <details class="more">
-                        <summary>更多</summary>
+                        <summary aria-label="更多操作">更多</summary>
                         <div class="more__menu">
-                            <button type="button" data-act="edit">编辑</button>
-                            <button type="button" data-act="delete">删除</button>
+                            <button type="button" data-act="edit">编辑配置</button>
+                            <button type="button" class="is-danger" data-act="delete">删除账号</button>
                         </div>
                     </details>
                 </div>
@@ -578,10 +595,10 @@ async function handleSaveAccount(event) {
     const errorEl = $('#form-error')
 
     const body = {
-        index: state.editingIndex || state.nextIndex,
         saveFingerprintMobile: $('#f-fp-mobile').checked,
         saveFingerprintDesktop: $('#f-fp-desktop').checked
     }
+    if (state.editingIndex) body.index = state.editingIndex
     for (const [key, selector] of Object.entries(FIELDS)) {
         const el = $(selector)
         if (el instanceof HTMLInputElement) body[key] = el.value
@@ -615,13 +632,132 @@ async function handleSaveAccount(event) {
 
 /* ────────────────────────── 授权弹窗 ────────────────────────── */
 
-function openLoginDialog(account) {
+const PLATFORM_HINT = {
+    mobile: '仅启动手机端指纹浏览器登录 1 次，用于手机搜索、App 每日签到和阅读任务。',
+    desktop: '仅启动电脑端指纹浏览器登录 1 次，用于电脑搜索、每日任务和浏览活动。',
+    both: '微软 PC 与手机端会话及指纹相互独立：将先完成第 1 步（移动端登录），关闭后自动弹出第 2 步（桌面端登录）。'
+}
+
+function pickDefaultPlatform(account) {
+    const hasMobile = Boolean(account?.sessions?.mobile?.cookies)
+    const hasDesktop = Boolean(account?.sessions?.desktop?.cookies)
+    if (!hasMobile && hasDesktop) return 'mobile'
+    if (hasMobile && !hasDesktop) return 'desktop'
+    return 'both'
+}
+
+function syncPlatformPicker() {
+    let selected = 'both'
     for (const chip of $$('#platform-picker .radio-chip')) {
         const input = $('input', chip)
-        input.checked = input.value === 'both'
         chip.classList.toggle('is-active', input.checked)
+        if (input.checked) selected = input.value
     }
+    const hint = $('#platform-hint')
+    if (hint) hint.textContent = PLATFORM_HINT[selected] || PLATFORM_HINT.both
+}
+
+function renderLoginSessionState(account) {
+    const box = $('#login-session-state')
+    if (!box) return
+    const items = [
+        { key: 'mobile', label: '手机端会话', session: account?.sessions?.mobile },
+        { key: 'desktop', label: '电脑端会话', session: account?.sessions?.desktop }
+    ]
+    box.innerHTML = items
+        .map(({ label, session }) => {
+            const ok = Boolean(session?.cookies)
+            const meta = ok ? `已连接 · ${session.cookies} cookies · ${ago(session.updatedAt) || '已保存'}` : '尚未登录'
+            return `<div class="session-card" data-ok="${ok}">
+                <span class="session-card__dot" aria-hidden="true"></span>
+                <div>
+                    <strong>${label}</strong>
+                    <span>${escapeHtml(meta)}</span>
+                </div>
+            </div>`
+        })
+        .join('')
+}
+
+function detectLoginPhase(job) {
+    if (!job || job.platform !== 'both') return null
+    const details = job.verification?.details || []
+    const verified = p => details.find(d => d.platform === p)
+    const lines = (job.log || []).map(line => line.text || '')
+    const savedMobile = Boolean(verified('mobile')?.fresh) || lines.some(t => /Saved mobile session/i.test(t))
+    const savedDesktop = Boolean(verified('desktop')?.fresh) || lines.some(t => /Saved desktop session/i.test(t))
+    const openedDesktop = savedDesktop || lines.some(t => /Opening desktop|desktop manual login|\[DESKTOP\]/i.test(t))
+
+    if (job.state !== 'running') {
+        const mOk = Boolean(verified('mobile')?.fresh)
+        const dOk = Boolean(verified('desktop')?.fresh)
+        return {
+            step: dOk || mOk ? 2 : 1,
+            mobile: mOk ? 'done' : 'failed',
+            desktop: dOk ? 'done' : 'failed',
+            mobileText: mOk ? '会话已保存' : '未写入会话',
+            desktopText: dOk ? '会话已保存' : '未写入会话'
+        }
+    }
+    if (savedDesktop) {
+        return { step: 2, mobile: savedMobile ? 'done' : 'active', desktop: 'done', mobileText: savedMobile ? '已保存' : '检测中', desktopText: '已保存' }
+    }
+    if (savedMobile || openedDesktop) {
+        return {
+            step: 2,
+            mobile: savedMobile ? 'done' : 'active',
+            desktop: 'active',
+            mobileText: savedMobile ? '已完成并保存' : '切换中',
+            desktopText: '请在浏览器中完成第 2 次登录'
+        }
+    }
+    return {
+        step: 1,
+        mobile: 'active',
+        desktop: 'pending',
+        mobileText: '请在浏览器中完成第 1 次登录',
+        desktopText: '等待移动端保存后自动弹出'
+    }
+}
+
+function renderLoginSteps(job) {
+    const el = $('#login-steps')
+    if (!el) return null
+    const phase = detectLoginPhase(job)
+    if (!phase) {
+        el.hidden = true
+        return null
+    }
+    el.hidden = false
+    el.innerHTML = `
+        <div class="login-step" data-state="${phase.mobile}">
+            <span class="login-step__num">${phase.mobile === 'done' ? '✓' : '1'}</span>
+            <div class="login-step__body">
+                <strong>步骤 1 · 移动端登录</strong>
+                <span>${escapeHtml(phase.mobileText)}</span>
+            </div>
+        </div>
+        <div class="login-step" data-state="${phase.desktop}">
+            <span class="login-step__num">${phase.desktop === 'done' ? '✓' : '2'}</span>
+            <div class="login-step__body">
+                <strong>步骤 2 · 桌面端登录</strong>
+                <span>${escapeHtml(phase.desktopText)}</span>
+            </div>
+        </div>`
+    return phase
+}
+
+function openLoginDialog(account) {
+    const preferred = pickDefaultPlatform(account)
+    for (const chip of $$('#platform-picker .radio-chip')) {
+        const input = $('input', chip)
+        input.checked = input.value === preferred
+    }
+    syncPlatformPicker()
+    renderLoginSessionState(account)
+
     state.jobEmail = account.email
+    state.jobRunning = false
     $('#dlg-login-title').textContent = `微软账号授权 · ACCOUNT_${account.index}`
     $('#dlg-login-sub').textContent = account.email
     $('#job-log').innerHTML = '<div class="log-empty">启动后这里会实时显示上游脚本的输出。</div>'
@@ -630,6 +766,7 @@ function openLoginDialog(account) {
     $('#job-time').textContent = ''
     $('#job-hint').hidden = true
     $('#remote-browser').hidden = true
+    $('#login-steps').hidden = true
     $('#verify-list').hidden = true
     $('#btn-stop-login').hidden = true
     $('#btn-start-login').disabled = false
@@ -639,7 +776,7 @@ function openLoginDialog(account) {
     // 已有任务则接管显示
     api(`/api/login/job?email=${encodeURIComponent(account.email)}`)
         .then(({ job }) => {
-            if (!job) return
+            if (!job || !$('#dlg-login').open || state.jobEmail !== account.email) return
             renderJob(job)
             if (job.state === 'running') connectJobStream(account.email)
         })
@@ -667,6 +804,7 @@ function closeJobStream() {
 
 function renderJob(job) {
     if (!job || (state.jobEmail && job.email !== state.jobEmail)) return
+    state.jobRunning = job.state === 'running'
     const statusEl = $('#job-status')
     const textEl = $('.job-status__text', statusEl)
     const hintEl = $('#job-hint')
@@ -678,6 +816,19 @@ function renderJob(job) {
 
     hintEl.hidden = !job.hint
     if (job.hint) hintEl.textContent = job.hint
+
+    const phase = renderLoginSteps(job)
+    const remoteNote = $('#remote-browser-note')
+    if (remoteNote) {
+        if (job.platform === 'both') {
+            remoteNote.textContent =
+                phase?.step === 2
+                    ? '移动端已保存！当前为第 2/2 步，请在远程窗口继续完成桌面端登录。'
+                    : '当前为第 1/2 步（移动端登录）；完成后窗口会关闭并自动打开第 2 个桌面端登录窗口。'
+        } else {
+            remoteNote.textContent = `仅需完成 1 次${job.platform === 'desktop' ? '桌面端' : '移动端'}微软登录，完成后自动保存会话。`
+        }
+    }
 
     const verifyEl = $('#verify-list')
     if (job.verification?.details?.length) {
@@ -697,19 +848,29 @@ function renderJob(job) {
     const platformText = job.platform === 'both' ? '移动端 + 桌面端' : job.platform === 'desktop' ? '桌面端' : '移动端'
 
     if (job.state === 'running') {
-        textEl.textContent = `${job.desktopUrl ? '等待你在远程窗口登录' : '运行中'} · ${platformText}${job.fresh ? ' · 全新授权' : ''}`
+        if (job.platform === 'both' && phase) {
+            textEl.textContent =
+                phase.step === 2
+                    ? '步骤 2/2 · 移动端已保存，请继续完成桌面端登录'
+                    : `${job.desktopUrl ? '步骤 1/2 · 请在远程窗口完成移动端登录' : '步骤 1/2 · 正在启动移动端登录'}`
+        } else {
+            textEl.textContent = `${job.desktopUrl ? '等待你在远程窗口登录' : '运行中'} · ${platformText}${job.fresh ? ' · 全新授权' : ''}`
+        }
         $('#job-time').textContent = `开始于 ${timeOf(job.startedAt)}`
         $('#btn-stop-login').hidden = false
         $('#btn-start-login').disabled = true
         $('.liquid-btn__text', $('#btn-start-login')).textContent = job.desktopUrl ? '等待完成登录' : '运行中…'
     } else if (job.state === 'done' || job.state === 'partial') {
-        textEl.textContent = job.state === 'done' ? `授权完成 · 会话已写入 ${platformText}` : `只完成 ${job.verification?.saved.join('、') || '部分平台'}`
+        textEl.textContent = job.state === 'done' ? `授权完成 · 会话已写入 ${platformText}` : `只完成 ${job.verification?.saved.map(p => (p === 'mobile' ? '移动端' : '桌面端')).join('、') || '部分平台'}`
         $('#job-time').textContent = timeOf(job.endedAt)
         $('#btn-stop-login').hidden = true
         $('#btn-start-login').disabled = false
         $('.liquid-btn__text', $('#btn-start-login')).textContent = '再次授权'
         closeJobStream()
-        refreshAccounts()
+        refreshAccounts().then(() => {
+            const updated = state.accounts?.accounts?.find(a => a.email === job.email)
+            if (updated) renderLoginSessionState(updated)
+        })
         refreshRuns()
     } else if (job.state === 'failed' || job.state === 'cancelled') {
         textEl.textContent =
@@ -731,20 +892,21 @@ function renderJob(job) {
 
 function renderJobLog(lines) {
     const view = $('#job-log')
+    const stick = view.scrollHeight - view.scrollTop - view.clientHeight < 50
     if (!lines.length) {
         view.innerHTML = '<div class="log-empty">启动后这里会实时显示上游脚本的输出。</div>'
         return
     }
     view.innerHTML = lines
         .map(
-            line => `<div class="log-line" data-level="${line.level}">
+            line => `<div class="log-line" data-level="${escapeHtml(line.level)}">
                 <span class="log-line__time">${line.t ? timeOf(line.t) : ''}</span>
-                <span class="log-line__level">${line.level}</span>
+                <span class="log-line__level">${escapeHtml(line.level)}</span>
                 <span class="log-line__msg">${escapeHtml(line.text)}</span>
             </div>`
         )
         .join('')
-    view.scrollTop = view.scrollHeight
+    if (stick) view.scrollTop = view.scrollHeight
 }
 
 async function handleStartLogin() {
@@ -849,6 +1011,10 @@ function applyTheme(theme) {
 /* ────────────────────────── 事件 ────────────────────────── */
 
 function bindEvents() {
+    const closeEditor = () => {
+        $('#account-editor').classList.remove('is-open')
+        resetForm()
+    }
     const openEditor = () => {
         resetForm()
         $('.advanced').open = false
@@ -861,9 +1027,12 @@ function bindEvents() {
         openEditor()
     })
     $('#btn-empty-add')?.addEventListener('click', openEditor)
-    $('#btn-close-form').addEventListener('click', () => {
-        $('#account-editor').classList.remove('is-open')
-        resetForm()
+    $('#btn-close-form').addEventListener('click', closeEditor)
+    $('.form-backdrop')?.addEventListener('click', event => {
+        if (event.target === event.currentTarget && $('#account-editor').classList.contains('is-open')) closeEditor()
+    })
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && $('#account-editor').classList.contains('is-open')) closeEditor()
     })
     $('#unlock-form').addEventListener('submit', handleUnlock)
     $('#btn-reveal-token').addEventListener('click', event => {
@@ -884,7 +1053,10 @@ function bindEvents() {
     }
     for (const dialog of $$('dialog.dialog')) {
         dialog.addEventListener('click', event => {
-            if (event.target === dialog) dialog.close()
+            if (event.target === dialog) {
+                if (dialog.id === 'dlg-login' && state.jobRunning) return
+                dialog.close()
+            }
         })
     }
     for (const button of $$('[data-reveal]')) {
@@ -925,10 +1097,11 @@ function bindEvents() {
         panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', tab.id)
     }
     $('#tabs').addEventListener('keydown', event => {
-        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
         event.preventDefault()
         const tabs = $$('#tabs .tab'), i = tabs.indexOf(document.activeElement)
-        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (i + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+        const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (i + (forward ? 1 : -1) + tabs.length) % tabs.length
         tabs[next].focus(); tabs[next].click()
     })
 
@@ -1026,24 +1199,35 @@ function bindEvents() {
         }
     })
 
+    $('#s-control-token').addEventListener('input', () => {
+        if ($('#s-control-token').value.trim()) $('#s-control-token-clear').checked = false
+    })
+
+    $('#s-control-token-clear').addEventListener('change', () => {
+        if ($('#s-control-token-clear').checked) $('#s-control-token').value = ''
+    })
+
     $('#btn-save-control').addEventListener('click', async () => {
         try {
-            const result = await api('/api/config', {
-                method: 'PUT',
-                body: { controlApi: $('#s-control-api').value.trim(), controlToken: $('#s-control-token').value.trim() }
-            })
+            const body = { controlApi: $('#s-control-api').value.trim() }
+            const token = $('#s-control-token').value.trim()
+            if ($('#s-control-token-clear').checked) body.clearControlToken = true
+            else if (token) body.controlToken = token
+            const result = await api('/api/config', { method: 'PUT', body })
             state.control = result.control
             $('#s-control-token').value = ''
+            $('#s-control-token-clear').checked = false
             await refreshState()
             const status = result.control?.status
-            toast(status === 'online' ? 'success' : 'error', status === 'online' ? '签到接口已连通' : `签到接口${status === 'unauthorized' ? '令牌无效' : '不可用'}`)
+            if (status === 'online') toast('success', '签到接口已连通')
+            else if (status === 'unconfigured') toast('info', '已清除签到接口配置')
+            else toast('error', `签到接口${status === 'unauthorized' ? '令牌无效' : '不可用'}`)
         } catch (error) {
             toast('error', error.message)
         }
     })
 
-    $('#s-panel-token').addEventListener('keydown', async event => {
-        if (event.key !== 'Enter') return
+    const savePanelPassword = async () => {
         const value = $('#s-panel-token').value.trim()
         if (value.length < 8) return toast('error', '新密码至少 8 位，保存后重启仍然有效')
         try {
@@ -1053,21 +1237,20 @@ function bindEvents() {
         } catch (error) {
             toast('error', error.message)
         }
+    }
+    $('#s-panel-token').addEventListener('keydown', event => {
+        if (event.key === 'Enter') void savePanelPassword()
     })
+    $('#btn-save-password')?.addEventListener('click', savePanelPassword)
 
     $('#btn-start-login').addEventListener('click', handleStartLogin)
     $('#btn-stop-login').addEventListener('click', handleStopLogin)
     $('#dlg-login').addEventListener('close', () => {
         closeJobStream()
         state.jobEmail = null
+        state.jobRunning = false
     })
-    for (const chip of $$('.radio-chip')) {
-        chip.addEventListener('click', () => {
-            setTimeout(() => {
-                for (const other of $$('.radio-chip')) other.classList.toggle('is-active', $('input', other).checked)
-            }, 0)
-        })
-    }
+    $('#platform-picker').addEventListener('change', syncPlatformPicker)
 
     $('#log-filter').addEventListener('click', event => {
         const item = event.target.closest('.seg__item')
@@ -1079,13 +1262,6 @@ function bindEvents() {
     $('#btn-clear-logs').addEventListener('click', () => {
         state.feed = []
         renderFeed()
-    })
-
-    document.addEventListener('pointermove', event => {
-        const button = event.target.closest?.('.liquid-btn')
-        if (!button) return
-        const rect = button.getBoundingClientRect()
-        button.style.setProperty('--mx', `${((event.clientX - rect.left) / rect.width) * 100}%`)
     })
 }
 

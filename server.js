@@ -191,11 +191,18 @@ function verifySession(cookieValue) {
 }
 
 function parseCookies(header = '') {
-    const out = {}
+    const out = Object.create(null)
     for (const part of String(header).split(';')) {
         const index = part.indexOf('=')
         if (index === -1) continue
-        out[part.slice(0, index).trim()] = decodeURIComponent(part.slice(index + 1).trim())
+        const name = part.slice(0, index).trim()
+        if (!name) continue
+        const raw = part.slice(index + 1).trim()
+        try {
+            out[name] = decodeURIComponent(raw)
+        } catch {
+            out[name] = raw
+        }
     }
     return out
 }
@@ -1436,6 +1443,7 @@ const server = http.createServer(async (req, res) => {
                 candidates: detection?.candidates ?? [],
                 control,
                 controlConfigured: Boolean(state.controlApi || state.controlToken),
+                hasControlToken: Boolean(state.controlToken),
                 version: process.version,
                 platform: process.platform
             })
@@ -1469,7 +1477,8 @@ const server = http.createServer(async (req, res) => {
                 state.botDir = inspection.dir
             }
             if (typeof body.controlApi === 'string') state.controlApi = body.controlApi.trim()
-            if (typeof body.controlToken === 'string') state.controlToken = body.controlToken.trim()
+            if (body.clearControlToken === true) state.controlToken = ''
+            else if (typeof body.controlToken === 'string') state.controlToken = body.controlToken.trim()
             if (body.disconnect === true) {
                 state.botDir = ''
                 state.controlApi = ''
@@ -1479,7 +1488,7 @@ const server = http.createServer(async (req, res) => {
 
             const accounts = state.botDir ? buildAccountsPayload(state.botDir) : null
             const control = await probeControlApi()
-            return json(res, 200, { ok: true, botDir: state.botDir, accounts, control })
+            return json(res, 200, { ok: true, botDir: state.botDir, hasControlToken: Boolean(state.controlToken), accounts, control })
         }
 
         if (pathname === '/api/auth/password' && req.method === 'POST') {
@@ -1508,12 +1517,16 @@ const server = http.createServer(async (req, res) => {
 
             const envPath = path.join(dir, '.env')
             const model = readEnvModel(envPath)
-            const requested = Number(body.index)
-            const index = Number.isInteger(requested) && requested > 0
-                ? requested
-                : model.accounts.size
-                  ? Math.max(...model.accounts.keys()) + 1
-                  : 1
+            let index
+            if (body.index != null && body.index !== '') {
+                const requested = Number(body.index)
+                if (!Number.isInteger(requested) || requested < 1) {
+                    return json(res, 422, { error: '账号序号不合法' })
+                }
+                index = requested
+            } else {
+                index = model.accounts.size ? Math.max(...model.accounts.keys()) + 1 : 1
+            }
 
             const { errors, value } = normalizeAccountInput(body)
             if (!value.email) errors.push('邮箱必填')
