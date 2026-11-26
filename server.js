@@ -116,7 +116,8 @@ const state = {
     botDir: '',
     controlApi: '',
     controlToken: '',
-    panelToken: ''
+    panelToken: '',
+    panelTokenSource: ''
 }
 
 function loadConfig() {
@@ -149,12 +150,17 @@ function ensurePanelToken() {
     const fromEnv = String(process.env.PANEL_TOKEN || '').trim()
     if (fromEnv) {
         state.panelToken = fromEnv
+        state.panelTokenSource = 'PANEL_TOKEN'
         return { token: fromEnv, generated: false, source: 'PANEL_TOKEN' }
     }
-    if (state.panelToken) return { token: state.panelToken, generated: false, source: 'config.json' }
+    if (state.panelToken) {
+        state.panelTokenSource = 'config.json'
+        return { token: state.panelToken, generated: false, source: 'config.json' }
+    }
 
     const token = randomBytes(12).toString('base64url')
     state.panelToken = token
+    state.panelTokenSource = 'generated'
     saveConfig()
     return { token, generated: true, source: 'generated' }
 }
@@ -586,6 +592,9 @@ function normalizeAccountInput(input) {
         desktop: parseBool(input.saveFingerprintDesktop)
     }
 
+    out.removePassword = input.removePassword === true
+    out.removeTotp = input.removeTotp === true
+    out.removeRecovery = input.removeRecovery === true
     out.removeProxy = input.removeProxy === true
 
     return { errors, value: out }
@@ -967,7 +976,7 @@ const desktopProxy = createDesktopProxy({
 })
 let browserStartPending = false
 
-async function guardedBrowserStart(action) {
+async function guardedBrowserStart(action, { busyMessage = '签到任务正在运行，请先停止或等待结束再授权。' } = {}) {
     if (!REMOTE_DESKTOP) return action()
     if (browserStartPending || [...jobs.values()].some(job => job.state === 'running')) {
         throw Object.assign(new Error('已有授权或签到任务，请等待完成后再启动。'), { status: 409 })
@@ -976,9 +985,16 @@ async function guardedBrowserStart(action) {
     try {
         const control = await probeControlApi()
         if (control.status !== 'online') throw Object.assign(new Error('容器内签到服务尚未就绪，请稍后重试。'), { status: 503 })
-        if (control.remoteState !== 'idle') throw Object.assign(new Error('签到任务正在运行，请先停止或等待结束再授权。'), { status: 409 })
+        if (control.remoteState !== 'idle') throw Object.assign(new Error(busyMessage), { status: 409 })
         return await action()
     } finally { browserStartPending = false }
+}
+
+async function assertNotRunningRun(busyMessage = '签到任务正在运行，请先停止或等待结束后再修改账号配置。') {
+    const control = await probeControlApi()
+    if (control.status === 'online' && control.remoteState && control.remoteState !== 'idle') {
+        throw Object.assign(new Error(busyMessage), { status: 409 })
+    }
 }
 
 function jobView(job) {
@@ -1158,9 +1174,13 @@ function startManualLogin({ botDir, email, platform, fresh }) {
         const { saved, missing } = job.verification
         const exitedCleanly = code === 0 && !signal
 
+        const platformLabel = list => list.map(p => (p === 'mobile' ? '移动端' : p === 'desktop' ? '桌面端' : p)).join('、')
+
         if (job.cancelled || signal) {
             job.state = 'cancelled'
-            job.hint = '任务被终止，未写入新的会话。'
+            job.hint = saved.length
+                ? `任务已终止。终止前已保存 ${platformLabel(saved)} 会话${missing.length ? `，${platformLabel(missing)} 未写入` : ''}。`
+                : '任务已终止，未写入新的会话。'
         } else if (!exitedCleanly) {
             job.state = 'failed'
             job.hint = code === 75 ? '已有授权或签到任务占用浏览器，请等待完成后重试。'
@@ -1171,7 +1191,7 @@ function startManualLogin({ botDir, email, platform, fresh }) {
             job.hint = diagnoseFailure(joined, job.verification)
         } else if (missing.length) {
             job.state = 'partial'
-            job.hint = `只保存了 ${saved.join('、')} 会话，${missing.join('、')} 未写入：需要再单独授权一次该平台。`
+            job.hint = `只保存了 ${platformLabel(saved)} 会话，${platformLabel(missing)} 未写入：需要再单独授权一次该平台。`
         } else {
             job.state = 'done'
             job.hint = null
@@ -1284,6 +1304,19 @@ async function callControlApi(method, endpoint, body) {
     }
 }
 
+const MOBILE_WORKERS = ['doMobileSearch', 'doDailyCheckIn', 'doReadToEarn', 'doAppPromotions']
+const DESKTOP_WORKERS = ['doDailySet', 'doMorePromotions', 'doPunchCards', 'doClaimBonusPoints', 'doDesktopSearch', 'doActivateSearchPerk', 'doBonusSearches', 'doVisualSearch']
+
+function requiredSessionPlatforms(dir) {
+    const workers = loadBotConfig(dir).data?.workers
+    if (!workers || typeof workers !== 'object') return { mobile: true, desktop: true }
+    const hasKnown = [...MOBILE_WORKERS, ...DESKTOP_WORKERS].some(key => typeof workers[key] === 'boolean')
+    if (!hasKnown) return { mobile: true, desktop: true }
+    const mobile = MOBILE_WORKERS.some(key => workers[key] === true)
+    const desktop = DESKTOP_WORKERS.some(key => workers[key] === true)
+    return mobile || desktop ? { mobile, desktop } : { mobile: true, desktop: true }
+}
+
 function runReadiness(accountIndex) {
     const dir = currentBotDir()
     const accounts = dir ? buildAccountsPayload(dir).accounts || [] : []
@@ -1291,10 +1324,22 @@ function runReadiness(accountIndex) {
     if (!selected.length) return { ready: false, action: 'accounts', error: accountIndex == null ? '还没有账号，请先添加微软账号。' : '这个账号已不存在，请刷新账号列表。', accounts: accounts.length }
     const check = preflight(dir)
     if (!check.runReady) return { ready: false, action: 'settings', error: `签到环境未就绪：${[...new Set([...check.blocking, ...check.runBlocking])].join('、')}。请到环境与设置查看检查结果。`, accounts: accounts.length }
-    const loginRequired = selected.filter(account => !account.hasPassword && ![account.sessions.mobile, account.sessions.desktop].some(session => session?.cookies > 0))
-    return { ready: !loginRequired.length, action: 'login', accounts: accounts.length,
-        loginRequired: loginRequired.map(account => ({ index: account.index, email: account.email })),
-        error: loginRequired.length ? '有账号尚未登录，也未保存自动登录密码。请先完成账号登录，再运行签到。' : null }
+    const need = requiredSessionPlatforms(dir)
+    const loginRequired = []
+    for (const account of selected) {
+        if (account.hasPassword) continue
+        const missingPlatforms = []
+        if (need.mobile && !(account.sessions.mobile?.cookies > 0)) missingPlatforms.push('手机端')
+        if (need.desktop && !(account.sessions.desktop?.cookies > 0)) missingPlatforms.push('电脑端')
+        if (missingPlatforms.length) loginRequired.push({ index: account.index, email: account.email, missingPlatforms })
+    }
+    const first = loginRequired[0]
+    const error = !loginRequired.length
+        ? null
+        : loginRequired.length === 1
+          ? `账号 ${first.email} 未保存密码且缺少${first.missingPlatforms.join('、')}会话，请先补全登录再运行签到。`
+          : `有 ${loginRequired.length} 个无密码账号会话不完整（如 ${first.email} 缺少${first.missingPlatforms.join('、')}），请先补全登录再运行签到。`
+    return { ready: !loginRequired.length, action: 'login', accounts: accounts.length, loginRequired, error }
 }
 
 async function controlStatus() {
@@ -1337,9 +1382,15 @@ const MIME = {
 }
 
 function serveStatic(req, res, pathname) {
-    const rel = pathname === '/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '')
-    const filePath = path.join(PUBLIC_DIR, rel)
-    if (!filePath.startsWith(PUBLIC_DIR)) return json(res, 403, { error: 'Forbidden' })
+    let decoded
+    try {
+        decoded = pathname === '/' ? 'index.html' : decodeURIComponent(pathname)
+    } catch {
+        return json(res, 400, { error: 'Invalid URL encoding' })
+    }
+    const rel = decoded.replace(/^\/+/, '')
+    const filePath = path.resolve(PUBLIC_DIR, rel)
+    if (filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) return json(res, 403, { error: 'Forbidden' })
 
     fs.readFile(filePath, (error, data) => {
         if (error) {
@@ -1451,6 +1502,7 @@ const server = http.createServer(async (req, res) => {
             const detection = botDir ? null : detectBotDir()
             return json(res, 200, {
                 authRequired: !AUTH_DISABLED,
+                passwordManagedByEnv: state.panelTokenSource === 'PANEL_TOKEN',
                 botDir,
                 configured: Boolean(state.botDir),
                 candidates: detection?.candidates ?? [],
@@ -1510,8 +1562,9 @@ const server = http.createServer(async (req, res) => {
             if (next.length < MIN_PANEL_TOKEN) return json(res, 422, { error: `新密码至少 ${MIN_PANEL_TOKEN} 位` })
             state.panelToken = next
             saveConfig()
+            sessionSecret = randomBytes(32)
             setSessionCookie(res)
-            return json(res, 200, { ok: true })
+            return json(res, 200, { ok: true, envManaged: state.panelTokenSource === 'PANEL_TOKEN' })
         }
 
         /* ── 账号 ── */
@@ -1527,6 +1580,7 @@ const server = http.createServer(async (req, res) => {
             const body = await readBody(req)
             const dir = currentBotDir()
             if (!dir) throw Object.assign(new Error('尚未连接有效实例'), { status: 422, missing: ['未连接实例'] })
+            await assertNotRunningRun('签到任务正在运行，请先停止或等待结束后再修改账号配置。')
 
             const envPath = path.join(dir, '.env')
             const model = readEnvModel(envPath)
@@ -1551,15 +1605,19 @@ const server = http.createServer(async (req, res) => {
             if (duplicate) return json(res, 409, { error: `该邮箱已存在于 ACCOUNT_${duplicate.index}` })
 
             if (model.accounts.has(index)) {
-                // 编辑：未提交的字段保持原值，绝不擅自改写
-                const keep = (field, key) => {
-                    if (value[field]) return
+                const oldEmail = (model.accounts.get(index)?.values.EMAIL || '').toLowerCase()
+                if (oldEmail && oldEmail !== value.email.toLowerCase() && jobs.get(oldEmail)?.state === 'running') {
+                    return json(res, 409, { error: '该账号正在进行授权，请结束后再修改邮箱' })
+                }
+                // 编辑：未提交且未要求清除的字段保持原值，绝不擅自改写
+                const keep = (field, key, removeFlag) => {
+                    if (value[field] || value[removeFlag]) return
                     const old = rawEnvValue(model, index, key)
                     if (old) value[field] = old
                 }
-                keep('password', 'PASSWORD')
-                keep('totpSecret', 'TOTP_SECRET')
-                keep('recoveryEmail', 'RECOVERY_EMAIL')
+                keep('password', 'PASSWORD', 'removePassword')
+                keep('totpSecret', 'TOTP_SECRET', 'removeTotp')
+                keep('recoveryEmail', 'RECOVERY_EMAIL', 'removeRecovery')
 
                 if (!value.proxy && !value.removeProxy) {
                     const oldUrl = rawEnvValue(model, index, 'PROXY_URL')
@@ -1596,17 +1654,20 @@ const server = http.createServer(async (req, res) => {
             if (!Number.isInteger(index) || index < 1) throw Object.assign(new Error('账号序号不合法'), { status: 400 })
             const dir = currentBotDir()
             if (!dir) throw Object.assign(new Error('尚未连接有效实例'), { status: 422 })
+            await assertNotRunningRun('签到任务正在运行，请先停止或等待结束后再删除账号。')
 
             const envPath = path.join(dir, '.env')
             const model = readEnvModel(envPath)
             const email = model.accounts.get(index)?.values.EMAIL
             if (!email) throw Object.assign(new Error('账号不存在'), { status: 404 })
 
-            const running = jobs.get(email.toLowerCase())
+            const key = email.toLowerCase()
+            const running = jobs.get(key)
             if (running?.state === 'running' && running.child) {
                 running.cancelled = true
                 running.child.kill()
             }
+            jobs.delete(key)
 
             deleteAccount(envPath, index)
             log('删除账号', `ACCOUNT_${index}`, email)
@@ -1668,9 +1729,20 @@ const server = http.createServer(async (req, res) => {
             let config = {}, upstreamVersion = null
             try { config = readTaskSettings(currentBotDir(), CONFIG_FILE); upstreamVersion = JSON.parse(fs.readFileSync(path.join(currentBotDir(), 'package.json'), 'utf8')).version || null } catch {}
             const known = new Map(history.accounts.map(account => [account.email.toLowerCase(), account]))
-            const current = accounts.map(account => ({ email: account.email, savedSession: Boolean(account.sessions.mobile?.cookies || account.sessions.desktop?.cookies),
-                todayPoints: known.get(account.email.toLowerCase())?.todayPoints ?? null,
-                balance: known.get(account.email.toLowerCase())?.balance ?? null, balanceAt: known.get(account.email.toLowerCase())?.balanceAt ?? null }))
+            const current = accounts.map(account => {
+                const mobileSaved = Boolean(account.sessions.mobile?.cookies)
+                const desktopSaved = Boolean(account.sessions.desktop?.cookies)
+                return {
+                    email: account.email,
+                    mobileSaved,
+                    desktopSaved,
+                    savedSession: mobileSaved && desktopSaved,
+                    partialSession: (mobileSaved || desktopSaved) && !(mobileSaved && desktopSaved),
+                    todayPoints: known.get(account.email.toLowerCase())?.todayPoints ?? null,
+                    balance: known.get(account.email.toLowerCase())?.balance ?? null,
+                    balanceAt: known.get(account.email.toLowerCase())?.balanceAt ?? null
+                }
+            })
             let scheduleState = null
             try { scheduleState = JSON.parse(fs.readFileSync(path.join(path.dirname(CONFIG_FILE), 'schedule-state.json'), 'utf8')) } catch {}
             return json(res, 200, { ...history, accounts: current, schedule: { ...readSchedule(CONFIG_FILE), supported: REMOTE_DESKTOP, last: scheduleState },
@@ -1713,11 +1785,18 @@ const server = http.createServer(async (req, res) => {
 
         /* ── Control API ── */
         if (pathname === '/api/task-settings' && req.method === 'GET') {
-            return json(res, 200, { ...readTaskSettings(currentBotDir(), CONFIG_FILE), schedulingSupported: REMOTE_DESKTOP })
+            const dir = currentBotDir()
+            if (!dir) throw Object.assign(new Error('尚未连接有效实例'), { status: 422 })
+            return json(res, 200, { ...readTaskSettings(dir, CONFIG_FILE), schedulingSupported: REMOTE_DESKTOP })
         }
         if (pathname === '/api/task-settings' && req.method === 'PUT') {
+            const dir = currentBotDir()
+            if (!dir) throw Object.assign(new Error('尚未连接有效实例'), { status: 422 })
             const body = await readBody(req)
-            const settings = await guardedBrowserStart(() => writeTaskSettings(currentBotDir(), CONFIG_FILE, body, { scheduling: REMOTE_DESKTOP }))
+            const settings = await guardedBrowserStart(
+                () => writeTaskSettings(dir, CONFIG_FILE, body, { scheduling: REMOTE_DESKTOP }),
+                { busyMessage: '签到任务正在运行，请先停止或等待结束后再修改签到设置。' }
+            )
             return json(res, 200, { ...settings, schedulingSupported: REMOTE_DESKTOP })
         }
         if (pathname === '/api/control/status' && req.method === 'GET') {
@@ -1739,7 +1818,10 @@ const server = http.createServer(async (req, res) => {
             }
             const readiness = runReadiness(payload.accountIndex)
             if (!readiness.ready) return json(res, 422, { error: readiness.error, action: readiness.action, readiness })
-            const result = await guardedBrowserStart(() => callControlApi('POST', '/start', payload))
+            const result = await guardedBrowserStart(
+                () => callControlApi('POST', '/start', payload),
+                { busyMessage: '签到任务正在运行，请勿重复启动。' }
+            )
             return json(res, result.ok ? 202 : result.http || 503, result)
         }
 

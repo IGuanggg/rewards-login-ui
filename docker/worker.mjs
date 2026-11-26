@@ -26,6 +26,17 @@ function stop(code) {
 }
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { cancelled = true; void stop(143) })
 
+function startQuiet(command, args, options = {}) {
+    const child = start(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] })
+    child._tail = ''
+    const collect = chunk => {
+        child._tail = (child._tail + chunk.toString('utf8')).slice(-2048)
+    }
+    child.stdout?.on('data', collect)
+    child.stderr?.on('data', collect)
+    return child
+}
+
 try {
     if (!['login', 'bot'].includes(mode)) throw new Error('Worker mode must be login or bot')
     const env = { ...process.env }
@@ -37,21 +48,30 @@ try {
             void stop(124)
         }, minutes * 60000)
         env.DISPLAY = ':99'
-        const display = start('Xvfb', [':99', '-screen', '0', '1366x900x24', '-nolisten', 'tcp', '-ac'])
+        const display = startQuiet('Xvfb', [':99', '-screen', '0', '1366x900x24', '-nolisten', 'tcp', '-ac'])
         children.push(display)
         const until = Date.now() + 12000
         while (!fs.existsSync('/tmp/.X11-unix/X99')) {
-            if (stopping || display.exitCode !== null || Date.now() > until) throw new Error('虚拟显示器未能启动')
+            if (stopping || display.exitCode !== null || Date.now() > until) {
+                if (!stopping && display._tail.trim()) console.error(display._tail.trim())
+                throw new Error('虚拟显示器未能启动')
+            }
             await new Promise(resolve => setTimeout(resolve, 100))
         }
         if (stopping) throw new Error('授权已取消')
-        const vnc = start('x11vnc', ['-display', ':99', '-localhost', '-rfbport', '5900', '-nopw', '-forever', '-shared', '-noxdamage', '-quiet'])
+        const vnc = startQuiet('x11vnc', ['-display', ':99', '-localhost', '-rfbport', '5900', '-nopw', '-forever', '-shared', '-noxdamage', '-quiet'])
         children.push(vnc)
-        await waitForPort(5900, vnc)
+        try { await waitForPort(5900, vnc) } catch (err) {
+            if (!stopping && vnc._tail.trim()) console.error(vnc._tail.trim())
+            throw err
+        }
         if (stopping) throw new Error('授权已取消')
-        const web = start('websockify', ['--web=/usr/share/novnc', '127.0.0.1:6080', '127.0.0.1:5900'])
+        const web = startQuiet('websockify', ['--web=/usr/share/novnc', '127.0.0.1:6080', '127.0.0.1:5900'])
         children.push(web)
-        await waitForPort(6080, web)
+        try { await waitForPort(6080, web) } catch (err) {
+            if (!stopping && web._tail.trim()) console.error(web._tail.trim())
+            throw err
+        }
         if (stopping) throw new Error('授权已取消')
         console.log('__PANEL_DESKTOP_READY__ 在面板点击“打开远程浏览器”完成登录。')
     } else {
@@ -79,7 +99,10 @@ try {
     // A failed display/proxy must also end the browser, not leave a hidden task.
     const first = await Promise.race([
         browser.done.then(code => ({ code })),
-        ...children.filter(child => child !== browser).map(child => child.done.then(() => ({ code: 1 })))
+        ...children.filter(child => child !== browser).map(child => child.done.then(() => {
+            if (!stopping && child._tail?.trim()) console.error(child._tail.trim())
+            return { code: 1 }
+        }))
     ])
     if (!stopping) await stop(first.code)
 } catch (error) {

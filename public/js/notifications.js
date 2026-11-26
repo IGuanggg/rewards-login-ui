@@ -74,6 +74,20 @@ export function createNotifications({ api, onUnauthorized }) {
     let busy = false, testing = false, data, previewState = 'completed', previewSeq = 0
     const isBark = () => $('#notification-provider').value === 'bark'
 
+    function hasUnsavedChannelChanges() {
+        if (!data) return false
+        const provider = $('#notification-provider').value
+        if (provider !== data.provider) return true
+        if ($('#notification-token').value.trim()) return true
+        if ($('#notification-clear').checked) return true
+        if (provider === 'bark') {
+            const currentServer = $('#notification-server').value.trim().replace(/\/+$/, '')
+            const savedServer = String(data.server || '').trim().replace(/\/+$/, '')
+            if (currentServer !== savedServer) return true
+        }
+        return false
+    }
+
     function syncProvider() {
         const provider = $('#notification-provider').value
         const bark = provider === 'bark'
@@ -88,8 +102,16 @@ export function createNotifications({ api, onUnauthorized }) {
             : (saved ? '已保存，留空保留' : '填入 Token / SendKey')
         const badge = $('#notify-preview-badge')
         if (badge) badge.textContent = PROVIDER_BADGE[provider] || provider
+        const dirty = hasUnsavedChannelChanges()
         const testBtn = $('#notification-test')
-        if (testBtn) testBtn.disabled = testing || !saved || (bark && !data?.server)
+        if (testBtn) {
+            testBtn.disabled = testing || dirty || !saved || (bark && !data?.server)
+            testBtn.title = dirty
+                ? '渠道、地址或密钥有未保存修改，请先点击「保存通知设置」后再发送测试'
+                : !saved || (bark && !data?.server)
+                  ? '请先填写并保存渠道密钥后再测试'
+                  : ''
+        }
     }
 
     async function refreshPreview() {
@@ -151,9 +173,19 @@ export function createNotifications({ api, onUnauthorized }) {
 
     $('#notification-provider').addEventListener('change', () => {
         $('#notification-token').value = ''
+        $('#notification-clear').checked = false
         syncProvider()
         void refreshPreview()
     })
+    $('#notification-token').addEventListener('input', () => {
+        if ($('#notification-token').value.trim()) $('#notification-clear').checked = false
+        syncProvider()
+    })
+    $('#notification-clear').addEventListener('change', () => {
+        if ($('#notification-clear').checked) $('#notification-token').value = ''
+        syncProvider()
+    })
+    $('#notification-server').addEventListener('input', syncProvider)
 
     $('#notify-preview-states')?.addEventListener('click', event => {
         const btn = event.target.closest('[data-state]')
@@ -197,15 +229,19 @@ export function createNotifications({ api, onUnauthorized }) {
         const saveBtn = $('#notification-save')
         saveBtn.disabled = true
         try {
+            const provider = $('#notification-provider').value
+            const server = $('#notification-server').value.trim()
+            const clearServer = provider === 'bark' && !server && Boolean(data?.provider === 'bark' && data?.server)
             data = await api('/api/notifications', {
                 method: 'PUT',
                 body: {
                     enabled: $('#notification-enabled').checked,
-                    provider: $('#notification-provider').value,
+                    provider,
                     onlyProblems: $('#notification-onlyProblems').checked,
                     token: $('#notification-token').value,
-                    server: $('#notification-server').value,
-                    clearToken: $('#notification-clear').checked
+                    server,
+                    clearToken: $('#notification-clear').checked,
+                    clearServer
                 }
             })
             render()

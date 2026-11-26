@@ -41,7 +41,15 @@ const activityPanel = createActivityPanel({ api, escapeHtml, timeOf, onUnauthori
 const runConsole = createRunConsole({ api,
     onUnauthorized: () => showUnlock('会话已过期，请重新输入访问密码'),
     onStart: index => { activityPanel.today(); toast('success', index == null ? '已提交全部账号签到，运行进度会自动更新' : '已提交该账号签到，运行进度会自动更新') },
+    onError: message => toast('error', message, 5200),
     onAction: (action, email, info) => {
+        if (action === 'dashboard') { $('#tabs [data-tab="dashboard"]').click(); return }
+        if (action === 'stop-auth' && email) {
+            api('/api/login/stop', { method: 'POST', body: { email } })
+                .then(() => { toast('info', '已发送终止授权指令'); runConsole.refresh(true); refreshRuns() })
+                .catch(error => toast('error', error.message))
+            return
+        }
         if (action === 'logs') { if (info?.latest) activityPanel.selectRun(info.latest.run); else activityPanel.today(); $('#tabs [data-tab="logs"]').click(); return }
         if (action === 'settings') { selectSettingsTab('system'); $('#tabs [data-tab="settings"]').click(); return }
         if (action === 'desktop' && info?.authorization?.desktopUrl) { window.open(info.authorization.desktopUrl, '_blank', 'noopener'); return }
@@ -369,9 +377,11 @@ async function refreshState() {
         if (clearWrap) clearWrap.hidden = !hasControlToken
         if (clearBox && !hasControlToken) clearBox.checked = false
 
-        $('#s-auth-note').textContent = info.authRequired
-            ? '修改密码后需重新登录。'
-            : '已通过 PANEL_NO_AUTH 关闭密码验证。'
+        $('#s-auth-note').textContent = !info.authRequired
+            ? '已通过 PANEL_NO_AUTH 关闭密码验证。'
+            : info.passwordManagedByEnv
+              ? '当前密码由环境变量 PANEL_TOKEN 接管：在此修改仅本次运行有效，重启容器后会恢复为环境变量值。修改后保留当前窗口登录态，其他设备需重新登录。'
+              : '修改后保留当前窗口登录态，其他已登录设备需使用新密码重新登录。'
         $('#s-auth-note').dataset.tone = info.authRequired ? 'muted' : 'bad'
 
         const preflight = await api('/api/preflight').catch(() => null)
@@ -559,17 +569,36 @@ function setFormMode(account) {
     state.editingIndex = account ? account.index : null
     $('#form-title').textContent = account ? '编辑账号' : '添加账号'
     $('#form-lead').textContent = account
-        ? '留空的密码和验证器密钥会保持原样。'
+        ? '留空的密码、密钥与代理会保持原样，也可勾选下方清除项删除。'
         : '先添加邮箱，再点「登录账号」完成微软登录，最后一键运行签到。'
     $('#btn-save .liquid-btn__text').textContent = account ? '保存修改' : '保存账号'
+    $('#btn-reset').textContent = account ? '重置修改' : '清空'
     $('#btn-close-form').hidden = !account && !(state.accounts?.accounts?.length)
+}
+
+function setClearFlags(account = null) {
+    const toggle = (wrapSel, boxSel, show) => {
+        const wrap = $(wrapSel)
+        const box = $(boxSel)
+        if (wrap) wrap.hidden = !show
+        if (box) box.checked = false
+    }
+    toggle('#f-remove-password-wrap', '#f-remove-password', Boolean(account?.hasPassword))
+    toggle('#f-remove-totp-wrap', '#f-remove-totp', Boolean(account?.hasTotp))
+    toggle('#f-remove-recovery-wrap', '#f-remove-recovery', Boolean(account?.hasRecovery))
+    toggle('#f-remove-proxy-wrap', '#f-remove-proxy', Boolean(account?.hasProxy))
+    const proxyCurrent = $('#f-proxy-current')
+    if (proxyCurrent) {
+        proxyCurrent.hidden = !account?.hasProxy
+        proxyCurrent.textContent = account?.hasProxy ? `当前已存代理：${account.proxyLabel || '已配置'}` : ''
+    }
 }
 
 function fillForm(account) {
     if (!account) return resetForm()
     $('#f-email').value = account.email
     $('#f-password').value = ''
-    $('#f-password').placeholder = account.hasPassword ? '留空则保持原密码' : '密码登录时必填'
+    $('#f-password').placeholder = account.hasPassword ? '已保存，留空保持原密码' : '密码登录时必填'
     $('#f-totp').value = ''
     $('#f-totp').placeholder = account.hasTotp ? '已保存，留空则不修改' : 'JBSWY3DPEHPK3PXP'
     $('#f-recovery').value = ''
@@ -577,11 +606,13 @@ function fillForm(account) {
     $('#f-geo').value = account.geoLocale || 'auto'
     $('#f-lang').value = account.langCode || 'zh-CN'
     $('#f-proxy-url').value = ''
+    $('#f-proxy-url').placeholder = account.hasProxy ? '留空保持当前代理；填写新地址可替换' : 'http://127.0.0.1'
     $('#f-proxy-port').value = ''
     $('#f-proxy-user').value = ''
     $('#f-proxy-pass').value = ''
     $('#f-fp-mobile').checked = Boolean(account.saveFingerprint?.mobile)
     $('#f-fp-desktop').checked = Boolean(account.saveFingerprint?.desktop)
+    setClearFlags(account)
     $('#form-error').hidden = true
     setFormMode(account)
 }
@@ -596,8 +627,10 @@ function resetForm() {
     $('#f-password').placeholder = '密码登录时必填'
     $('#f-totp').placeholder = 'JBSWY3DPEHPK3PXP'
     $('#f-recovery').placeholder = 'recovery@example.com'
+    $('#f-proxy-url').placeholder = 'http://127.0.0.1'
     $('#f-fp-mobile').checked = true
     $('#f-fp-desktop').checked = true
+    setClearFlags(null)
     $('#form-error').hidden = true
     setFormMode(null)
 }
@@ -606,12 +639,19 @@ async function handleSaveAccount(event) {
     event.preventDefault()
     const button = $('#btn-save')
     const errorEl = $('#form-error')
+    const wasEditing = Boolean(state.editingIndex)
 
     const body = {
         saveFingerprintMobile: $('#f-fp-mobile').checked,
         saveFingerprintDesktop: $('#f-fp-desktop').checked
     }
-    if (state.editingIndex) body.index = state.editingIndex
+    if (state.editingIndex) {
+        body.index = state.editingIndex
+        body.removePassword = Boolean($('#f-remove-password')?.checked)
+        body.removeTotp = Boolean($('#f-remove-totp')?.checked)
+        body.removeRecovery = Boolean($('#f-remove-recovery')?.checked)
+        body.removeProxy = Boolean($('#f-remove-proxy')?.checked)
+    }
     for (const [key, selector] of Object.entries(FIELDS)) {
         const el = $(selector)
         if (el instanceof HTMLInputElement) body[key] = el.value
@@ -632,7 +672,7 @@ async function handleSaveAccount(event) {
         applyAccounts(payload)
         resetForm()
         $('#account-editor').classList.remove('is-open')
-        toast('success', '账号已保存，点「登录账号」即可完成授权')
+        toast('success', wasEditing ? '账号配置已更新' : '账号已保存，点「登录账号」即可完成授权')
     } catch (error) {
         if (error.status === 401) return showUnlock('会话已过期，请重新输入访问密码')
         errorEl.textContent = error.message
@@ -760,13 +800,53 @@ function renderLoginSteps(job) {
     return phase
 }
 
-function openLoginDialog(account) {
-    const preferred = pickDefaultPlatform(account)
+function setLoginInputsLocked(locked) {
+    const picker = $('#platform-picker')
+    if (picker) {
+        picker.classList.toggle('is-locked', locked)
+        for (const input of $$('input', picker)) input.disabled = locked
+    }
+    const freshInput = $('#opt-fresh')
+    if (freshInput) freshInput.disabled = locked
+    $('#opt-fresh-row')?.classList.toggle('is-locked', locked)
+}
+
+function selectPlatformRadio(value) {
     for (const chip of $$('#platform-picker .radio-chip')) {
         const input = $('input', chip)
-        input.checked = input.value === preferred
+        input.checked = input.value === value
     }
     syncPlatformPicker()
+}
+
+function setLoginFooter({
+    startVisible = true,
+    startDisabled = false,
+    startText = '启动浏览器授权',
+    stopVisible = false,
+    doneVisible = false,
+    runNowVisible = false,
+    reauthVisible = false,
+    closeVisible = false
+} = {}) {
+    const startBtn = $('#btn-start-login')
+    if (startBtn) {
+        startBtn.hidden = !startVisible
+        startBtn.disabled = startDisabled || Boolean(startBtn.dataset.blockedByBusy)
+        $('.liquid-btn__text', startBtn).textContent = startText
+    }
+    if ($('#btn-stop-login')) $('#btn-stop-login').hidden = !stopVisible
+    if ($('#btn-login-done')) $('#btn-login-done').hidden = !doneVisible
+    if ($('#btn-login-run-now')) $('#btn-login-run-now').hidden = !runNowVisible
+    if ($('#btn-reauth-login')) $('#btn-reauth-login').hidden = !reauthVisible
+    if ($('#btn-login-close')) $('#btn-login-close').hidden = !closeVisible
+}
+
+function openLoginDialog(account) {
+    const preferred = pickDefaultPlatform(account)
+    selectPlatformRadio(preferred)
+    if ($('#opt-fresh')) $('#opt-fresh').checked = false
+    setLoginInputsLocked(false)
     renderLoginSessionState(account)
 
     state.jobEmail = account.email
@@ -781,18 +861,16 @@ function openLoginDialog(account) {
     $('#remote-browser').hidden = true
     $('#login-steps').hidden = true
     $('#verify-list').hidden = true
-    $('#btn-stop-login').hidden = true
-    $('#btn-start-login').disabled = false
-    $('.liquid-btn__text', $('#btn-start-login')).textContent = '启动浏览器授权'
+    setLoginFooter({ startVisible: true, startDisabled: false, startText: '启动浏览器授权' })
     runConsole.render()
     $('#dlg-login').showModal()
 
-    // 已有任务则接管显示
+    // 仅接管正在运行中的授权任务，不把过期的历史任务盖到当前会话状态上
     api(`/api/login/job?email=${encodeURIComponent(account.email)}`)
         .then(({ job }) => {
-            if (!job || !$('#dlg-login').open || state.jobEmail !== account.email) return
+            if (!job || job.state !== 'running' || !$('#dlg-login').open || state.jobEmail !== account.email) return
             renderJob(job)
-            if (job.state === 'running') connectJobStream(account.email)
+            connectJobStream(account.email)
         })
         .catch(() => {})
 }
@@ -862,6 +940,9 @@ function renderJob(job) {
     const platformText = job.platform === 'both' ? '移动端 + 桌面端' : job.platform === 'desktop' ? '桌面端' : '移动端'
 
     if (job.state === 'running') {
+        selectPlatformRadio(job.platform)
+        if ($('#opt-fresh')) $('#opt-fresh').checked = Boolean(job.fresh)
+        setLoginInputsLocked(true)
         if (job.platform === 'both' && phase) {
             textEl.textContent =
                 phase.step === 2
@@ -871,22 +952,45 @@ function renderJob(job) {
             textEl.textContent = `${job.desktopUrl ? '等待你在远程窗口登录' : '运行中'} · ${platformText}${job.fresh ? ' · 全新授权' : ''}`
         }
         $('#job-time').textContent = `开始于 ${timeOf(job.startedAt)}`
-        $('#btn-stop-login').hidden = false
-        $('#btn-start-login').disabled = true
-        $('.liquid-btn__text', $('#btn-start-login')).textContent = job.desktopUrl ? '等待完成登录' : '运行中…'
+        setLoginFooter({
+            stopVisible: true,
+            startVisible: true,
+            startDisabled: true,
+            startText: job.desktopUrl ? '等待完成登录' : '运行中…'
+        })
     } else if (job.state === 'done' || job.state === 'partial') {
+        setLoginInputsLocked(false)
         textEl.textContent = job.state === 'done' ? `授权完成 · 会话已写入 ${platformText}` : `只完成 ${job.verification?.saved.map(p => (p === 'mobile' ? '移动端' : '桌面端')).join('、') || '部分平台'}`
         $('#job-time').textContent = timeOf(job.endedAt)
-        $('#btn-stop-login').hidden = true
-        $('#btn-start-login').disabled = false
-        $('.liquid-btn__text', $('#btn-start-login')).textContent = '再次授权'
+        setLoginFooter({ doneVisible: job.state === 'done', closeVisible: job.state !== 'done', startVisible: job.state !== 'done', startText: '继续补全登录' })
         closeJobStream()
         refreshAccounts().then(() => {
+            if (!$('#dlg-login').open || state.jobEmail !== job.email || state.jobRunning) return
             const updated = state.accounts?.accounts?.find(a => a.email === job.email)
             if (updated) renderLoginSessionState(updated)
+            const hasMobile = Boolean(updated?.sessions?.mobile?.cookies)
+            const hasDesktop = Boolean(updated?.sessions?.desktop?.cookies)
+            if (job.state === 'done' && hasMobile && hasDesktop) {
+                setLoginFooter({
+                    startVisible: false,
+                    doneVisible: true,
+                    runNowVisible: true,
+                    reauthVisible: true
+                })
+            } else {
+                const missing = !hasDesktop ? 'desktop' : !hasMobile ? 'mobile' : 'both'
+                selectPlatformRadio(missing)
+                setLoginFooter({
+                    startVisible: true,
+                    startDisabled: false,
+                    startText: missing === 'desktop' ? '继续登录电脑端' : missing === 'mobile' ? '继续登录手机端' : '重新授权',
+                    closeVisible: true
+                })
+            }
         })
         refreshRuns()
     } else if (job.state === 'failed' || job.state === 'cancelled') {
+        setLoginInputsLocked(false)
         textEl.textContent =
             job.state === 'cancelled'
                 ? '已终止'
@@ -894,10 +998,13 @@ function renderJob(job) {
                   ? '未检测到新会话，请重试'
                   : `运行失败（退出码 ${job.exitCode ?? '—'}）`
         $('#job-time').textContent = timeOf(job.endedAt)
-        $('#btn-stop-login').hidden = true
-        $('#btn-start-login').disabled = false
-        $('.liquid-btn__text', $('#btn-start-login')).textContent = '重试'
+        setLoginFooter({ closeVisible: true, startVisible: true, startDisabled: false, startText: '重试' })
         closeJobStream()
+        refreshAccounts().then(() => {
+            if (!$('#dlg-login').open || state.jobEmail !== job.email || state.jobRunning) return
+            const updated = state.accounts?.accounts?.find(a => a.email === job.email)
+            if (updated) renderLoginSessionState(updated)
+        })
         refreshRuns()
     }
 
@@ -927,8 +1034,7 @@ async function handleStartLogin() {
     if (!state.jobEmail) return
     const platform = $('input[name="platform"]:checked')?.value || 'both'
     const fresh = $('#opt-fresh').checked
-    const button = $('#btn-start-login')
-    button.disabled = true
+    setLoginFooter({ startVisible: true, startDisabled: true, startText: '启动中…' })
 
     try {
         $('#job-log').innerHTML = ''
@@ -939,9 +1045,11 @@ async function handleStartLogin() {
         })
         renderJob(job)
         connectJobStream(state.jobEmail)
+        runConsole.refresh(true)
         toast('info', '授权已启动，请按页面提示完成微软登录')
     } catch (error) {
         if (error.status === 401) return showUnlock('会话已过期，请重新输入访问密码')
+        setLoginInputsLocked(false)
         const hint = $('#job-hint')
         if (hint) {
             hint.textContent = error.message
@@ -949,8 +1057,7 @@ async function handleStartLogin() {
         }
         $('#job-status').dataset.state = 'failed'
         $('.job-status__text').textContent = '无法启动授权'
-        button.disabled = false
-        $('.liquid-btn__text', button).textContent = '启动浏览器授权'
+        setLoginFooter({ startVisible: true, startDisabled: false, startText: '启动浏览器授权', closeVisible: true })
         runConsole.refresh(true)
     }
 }
@@ -997,7 +1104,9 @@ function mergeJobIntoFeed(job) {
 function renderFeed() {
     const view = $('#log-view')
     const filtered = state.logFilter === 'all' ? state.feed : state.feed.filter(line => line.level === state.logFilter)
-    $('#logs-hint').textContent = `共 ${state.feed.length} 行`
+    $('#logs-hint').textContent = state.feed.length
+        ? `共 ${state.feed.length} 行 · 仅显示账号登录/授权窗口输出，与上方签到任务日志无关`
+        : '仅显示账号登录/授权窗口输出，与上方签到任务日志无关'
 
     if (!filtered.length) {
         view.innerHTML = '<div class="log-empty">暂无日志。发起一次账号授权后，这里会实时滚动显示输出。</div>'
@@ -1159,7 +1268,6 @@ function bindEvents() {
         } catch {}
         closeFeed()
         closeJobStream()
-        localStorage.clear()
         state.botDir = ''
         state.accounts = null
         state.authenticated = false
@@ -1171,9 +1279,6 @@ function bindEvents() {
         refreshAccounts()
         refreshRuns()
         runConsole.refresh(true)
-    })
-    $('#btn-accounts-view-run')?.addEventListener('click', () => {
-        $('#tabs [data-tab="dashboard"]').click()
     })
 
     $('#account-list').addEventListener('click', async event => {
@@ -1206,6 +1311,7 @@ function bindEvents() {
             try {
                 const payload = await api(`/api/accounts/${index}`, { method: 'DELETE' })
                 applyAccounts(payload)
+                refreshRuns()
                 if (state.editingIndex === index) resetForm()
                 toast('success', '账号已删除')
             } catch (error) {
@@ -1216,7 +1322,29 @@ function bindEvents() {
     })
 
     $('#account-form').addEventListener('submit', handleSaveAccount)
-    $('#btn-reset').addEventListener('click', resetForm)
+    $('#btn-reset').addEventListener('click', () => {
+        if (state.editingIndex != null) {
+            const existing = state.accounts?.accounts?.find(a => a.index === state.editingIndex)
+            if (existing) { fillForm(existing); return }
+        }
+        resetForm()
+    })
+    for (const [inputSel, boxSel] of [
+        ['#f-password', '#f-remove-password'],
+        ['#f-totp', '#f-remove-totp'],
+        ['#f-recovery', '#f-remove-recovery']
+    ]) {
+        $(inputSel)?.addEventListener('input', () => { if ($(inputSel).value) $(boxSel).checked = false })
+        $(boxSel)?.addEventListener('change', () => { if ($(boxSel).checked) $(inputSel).value = '' })
+    }
+    for (const sel of ['#f-proxy-url', '#f-proxy-port', '#f-proxy-user', '#f-proxy-pass']) {
+        $(sel)?.addEventListener('input', () => { if ($(sel).value.trim()) $('#f-remove-proxy').checked = false })
+    }
+    $('#f-remove-proxy')?.addEventListener('change', () => {
+        if ($('#f-remove-proxy').checked) {
+            for (const sel of ['#f-proxy-url', '#f-proxy-port', '#f-proxy-user', '#f-proxy-pass']) $(sel).value = ''
+        }
+    })
 
     $('#btn-recheck').addEventListener('click', async () => {
         const dir = $('#s-botdir').value.trim()
@@ -1266,6 +1394,7 @@ function bindEvents() {
             $('#s-control-token').value = ''
             $('#s-control-token-clear').checked = false
             await refreshState()
+            runConsole.refresh(true)
             const status = result.control?.status
             if (status === 'online') toast('success', '签到接口已连通')
             else if (status === 'unconfigured') toast('info', '已清除签到接口配置')
@@ -1277,11 +1406,15 @@ function bindEvents() {
 
     const savePanelPassword = async () => {
         const value = $('#s-panel-token').value.trim()
-        if (value.length < 8) return toast('error', '新密码至少 8 位，保存后重启仍然有效')
+        if (value.length < 8) return toast('error', '新密码至少 8 位')
         try {
-            await api('/api/auth/password', { method: 'POST', body: { token: value } })
+            const res = await api('/api/auth/password', { method: 'POST', body: { token: value } })
             $('#s-panel-token').value = ''
-            toast('success', '面板访问密码已更新')
+            if (res.envManaged) {
+                toast('info', '密码已临时更新；当前部署配置了 PANEL_TOKEN 环境变量，重启容器后会恢复为环境变量值', 6500)
+            } else {
+                toast('success', '面板访问密码已更新，其他设备需重新登录')
+            }
         } catch (error) {
             toast('error', error.message)
         }
@@ -1292,11 +1425,25 @@ function bindEvents() {
     $('#btn-save-password')?.addEventListener('click', savePanelPassword)
 
     $('#btn-start-login').addEventListener('click', handleStartLogin)
+    $('#btn-reauth-login')?.addEventListener('click', handleStartLogin)
     $('#btn-stop-login').addEventListener('click', handleStopLogin)
+    $('#btn-login-done')?.addEventListener('click', () => $('#dlg-login').close())
+    $('#btn-login-close')?.addEventListener('click', () => $('#dlg-login').close())
+    $('#btn-login-run-now')?.addEventListener('click', () => {
+        const account = state.accounts?.accounts?.find(a => a.email === state.jobEmail)
+        $('#dlg-login').close()
+        if (account) void runAccount(account.index)
+    })
     $('#dlg-login').addEventListener('close', () => {
+        const wasRunning = state.jobRunning
         closeJobStream()
         state.jobEmail = null
         state.jobRunning = false
+        setLoginInputsLocked(false)
+        if (wasRunning) {
+            toast('info', '远程授权仍在后台运行，可随时从账号页回到授权窗口或终止', 5000)
+            runConsole.refresh(true)
+        }
     })
     $('#platform-picker').addEventListener('change', syncPlatformPicker)
 

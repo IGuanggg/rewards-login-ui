@@ -196,3 +196,53 @@ test('existing URL reward records recover explicit points once, survive reopen a
     assert.equal(db.db.prepare('SELECT count(*) AS n FROM activity_reward_points').get().n, 0)
     db.close()
 })
+
+test('v5 ACTIVITY-RESULT events populate tasks, accumulate item points, and classify warnings without sticking in running', t => {
+    const db = store(t)
+    const id = db.begin()
+    db.append(id, entry('DAILY-SET', 'Started solving "Daily Set" items | remaining=3', { platform: 'DESKTOP' }))
+    db.append(id, entry('ACTIVITY-RESULT', 'Daily set: "活动一" | completed | points earned: 10', { platform: 'DESKTOP' }))
+    db.append(id, entry('ACTIVITY-RESULT', 'Daily set: "活动二" | completed | points earned: 10', { platform: 'DESKTOP' }))
+    db.append(id, entry('ACTIVITY-RESULT', 'Daily set: "活动二" | completed | points earned: 10', { platform: 'DESKTOP' }))
+    db.append(id, entry('ACTIVITY-RESULT', 'Daily set: "活动三" | completed | points earned: 10', { platform: 'DESKTOP' }))
+    db.append(id, entry('ACTIVITY-RESULT', 'Desktop search quota | completed | points earned: unverified', { platform: 'DESKTOP', level: 'debug' }))
+    db.append(id, entry('ACTIVITY-RESULT', 'Read to Earn | already completed (skipped) | points earned: 0 | Already completed', { platform: 'MOBILE', level: 'debug' }))
+    db.append(id, entry('ACTIVITY-RESULT', 'Streak protection | could not be enabled or verified | No streak protection days remain', { platform: 'DESKTOP', level: 'warn' }))
+    db.append(id, entry('PUNCHCARD', '/earn unavailable - cannot list quests', { platform: 'DESKTOP', level: 'warn' }))
+    db.finish(id, 0, summary)
+    const tasks = db.detail(id).tasks
+    const byCat = Object.fromEntries(tasks.map(task => [task.category, task]))
+    assert.equal(byCat['DAILY-SET'].state, 'completed')
+    assert.equal(byCat['DAILY-SET'].points, 30)
+    assert.equal(byCat['SEARCH-BING'].state, 'completed')
+    assert.equal(byCat['READ-TO-EARN'].state, 'already_done')
+    assert.equal(byCat['ENABLE-STREAK-PROTECTION'].state, 'skipped')
+    assert.equal(byCat['PUNCHCARD'].state, 'partial')
+})
+
+test('v5 cancelled/partial runs preserve earned points and live balance, and overview attention matches day summary', t => {
+    const db = store(t)
+    const cancelledId = db.begin()
+    db.finish(cancelledId, 143, {
+        collected: null, finished: true,
+        accounts: [{ email: account, success: false, initialPoints: 2355, finalPoints: null, collectedPoints: null, pointsKnown: false, live: { balance: 2385, gained: 30 }, error: 'Run cancelled' }]
+    }, { cancelled: true })
+    const failedLoginId = db.begin()
+    db.finish(failedLoginId, 0, {
+        collected: null, finished: true,
+        accounts: [{ email: 'second@example.invalid', success: false, initialPoints: null, finalPoints: null, collectedPoints: 0, pointsKnown: false, error: 'Login failed at SIGN_IN_METHOD_PICKER' }]
+    })
+    const cancelledDetail = db.detail(cancelledId)
+    assert.equal(cancelledDetail.run.points, 30)
+    assert.equal(cancelledDetail.run.accounts[0].finalPoints, 2385)
+    assert.equal(cancelledDetail.run.accounts[0].collectedPoints, 30)
+    const failedDetail = db.detail(failedLoginId)
+    assert.equal(failedDetail.run.points, null)
+    assert.equal(failedDetail.run.accounts[0].collectedPoints, null)
+    const overview = db.overview()
+    const day = db.day()
+    assert.equal(overview.todayPoints, 30)
+    assert.equal(overview.accounts.find(a => a.email === account).balance, 2385)
+    assert.equal(overview.attention, (day.summary.attention || 0) + (day.summary.failedRuns || 0))
+    assert.equal(overview.attention, 1)
+})

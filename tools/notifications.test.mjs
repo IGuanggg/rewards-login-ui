@@ -37,6 +37,8 @@ test('bark: 留空保留已存配置，填写则覆盖', () => {
     assert.equal(kept.hasToken, true)
     const replaced = saveNotifications(panelFile, { provider: 'bark', enabled: true, onlyProblems: false, token: '', server: 'https://bark2.example.com' })
     assert.equal(replaced.server, 'https://bark2.example.com')
+    const cleared = saveNotifications(panelFile, { provider: 'bark', enabled: false, onlyProblems: false, token: '', server: '', clearServer: true })
+    assert.equal(cleared.server, '')
 })
 
 test('bark: 切换渠道后不保留服务器地址', () => {

@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { LOCK_FILE, lowMemoryConfig, migrateConfigToTemplate, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
 import { ActivityStore, activityFile } from '../lib/activity-store.mjs'
-import { readSchedule, scheduleDate } from '../lib/task-settings.mjs'
+import { readSchedule, scheduleDate, scheduleMarkerFile } from '../lib/task-settings.mjs'
 
 process.umask(0o077)
 if (['1', 'true', 'yes', 'on'].includes(String(process.env.PANEL_NO_AUTH).toLowerCase())) throw new Error('Docker 远程授权要求启用面板访问密码')
@@ -99,13 +99,13 @@ try {
     if (!stopping) children.push(start(process.execPath, [path.join(panelRoot, 'server.js')], { cwd: panelRoot, env }))
     {
         let scheduling = false
-        const marker = path.join(data, 'last-scheduled-date')
+        const marker = scheduleMarkerFile(panelFile)
         scheduleTimer = setInterval(async () => {
             if (stopping || scheduling) return
             scheduling = true
             try {
                 const schedule = readSchedule(panelFile)
-                const date = scheduleDate(schedule, Date.now(), fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8') : '')
+                const date = scheduleDate(schedule, Date.now(), fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8').trim() : '')
                 if (!date) return
                 const headers = { Authorization: `Bearer ${panel.controlToken}`, 'Content-Type': 'application/json' }
                 const health = await fetch('http://127.0.0.1:3010/health', { headers, signal: AbortSignal.timeout(3000) }).then(r => r.json())

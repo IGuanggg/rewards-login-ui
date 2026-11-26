@@ -5,7 +5,7 @@ const PLATFORMS = { MOBILE: '移动端', DESKTOP: '桌面端', MAIN: '通用' }
 
 export function createActivityPanel({ api, escapeHtml: esc, timeOf, onUnauthorized }) {
     const $ = selector => document.querySelector(selector)
-    const state = { active: false, busy: false, day: '', runId: '', timer: null, revision: '', tasksKey: '', logs: [], nextBefore: null, history: false, followLatest: true, logRequest: 0 }
+    const state = { active: false, busy: false, day: '', followToday: true, runId: '', timer: null, revision: '', tasksKey: '', logs: [], nextBefore: null, history: false, followLatest: true, logRequest: 0, autoOpenedRun: '' }
     const tone = value => ['completed', 'processed'].includes(value) ? 'tag--ok'
         : ['failed', 'partial', 'incomplete', 'interrupted'].includes(value) ? 'tag--warn' : 'tag--accent'
     const statusTag = value => `<span class="tag ${tone(value)}">${esc(LABELS[value] || value)}</span>`
@@ -61,17 +61,25 @@ export function createActivityPanel({ api, escapeHtml: esc, timeOf, onUnauthoriz
                 <td>${esc(PLATFORMS[task.platform] || task.platform)}</td><td>${statusTag(task.state)}</td><td class="num">${task.points ?? '—'}</td></tr>`).join('')
                 : '<tr><td colspan="6" class="activity-table-empty">尚未收到任务明细。启动检查和报错可以在原始日志中查看。</td></tr>'
         }
+        const raw = $('#activity-raw')
+        const rawSummary = $('#activity-raw-summary')
+        if (rawSummary) rawSummary.textContent = run.state === 'running' ? '本轮签到实时日志' : '本轮签到原始日志'
+        if (run.state === 'running' && state.autoOpenedRun !== id) {
+            state.autoOpenedRun = id
+            if (!raw.open) raw.open = true
+        }
         const revision = `${id}:${run.revision}:${run.state}:${$('#activity-log-level').value}`
-        if (revision !== state.revision && $('#activity-raw').open && !state.history) { await loadLogs(); state.revision = revision }
+        if (revision !== state.revision && raw.open && !state.history) { await loadLogs(); state.revision = revision }
     }
     async function refresh() {
         if (!state.active || state.busy || document.visibilityState === 'hidden') return
         clearTimeout(state.timer)
         state.busy = true
-        const requestedDay = state.day
+        const requestedDay = state.followToday ? '' : state.day
+        const followTodayAtStart = state.followToday
         try {
             const data = await api(`/api/activity${requestedDay ? `?day=${requestedDay}` : ''}`)
-            if (!state.active || state.day !== requestedDay) return
+            if (!state.active || state.followToday !== followTodayAtStart || (!followTodayAtStart && state.day !== requestedDay)) return
             state.day = data.day
             $('#activity-day').value = data.day
             $('#activity-runs').textContent = data.summary.runs
@@ -85,7 +93,8 @@ export function createActivityPanel({ api, escapeHtml: esc, timeOf, onUnauthoriz
             if (state.followLatest || !data.runs.some(run => run.id === state.runId)) state.runId = data.runs[0]?.id || ''
             const options = data.runs.map(run => `<option value="${esc(run.id)}">${timeOf(run.startedAt)} · ${esc(LABELS[run.state] || run.state)} · ${run.points ?? '—'} 积分</option>`).join('')
             const select = $('#activity-run-select')
-            if (select.innerHTML !== options) { select.innerHTML = options; select.value = state.runId }
+            if (select.innerHTML !== options) select.innerHTML = options
+            if (select.value !== state.runId) select.value = state.runId
             if (previous !== state.runId) { state.logs = []; state.nextBefore = null; state.revision = ''; state.tasksKey = ''; state.history = false }
             if (state.runId) await loadDetail()
         } catch (problem) { error(problem) }
@@ -94,8 +103,8 @@ export function createActivityPanel({ api, escapeHtml: esc, timeOf, onUnauthoriz
             if (state.active) state.timer = setTimeout(refresh, 3000)
         }
     }
-    $('#activity-day').addEventListener('change', () => { state.day = $('#activity-day').value; state.runId = ''; state.followLatest = true; void refresh() })
-    $('#activity-today').addEventListener('click', () => { state.day = ''; state.runId = ''; state.followLatest = true; void refresh() })
+    $('#activity-day').addEventListener('change', () => { state.day = $('#activity-day').value; state.followToday = !state.day; state.runId = ''; state.followLatest = true; void refresh() })
+    $('#activity-today').addEventListener('click', () => { state.day = ''; state.followToday = true; state.runId = ''; state.followLatest = true; void refresh() })
     $('#activity-refresh').addEventListener('click', () => { void refresh() })
     $('#activity-run-select').addEventListener('change', () => {
         state.runId = $('#activity-run-select').value
@@ -108,6 +117,6 @@ export function createActivityPanel({ api, escapeHtml: esc, timeOf, onUnauthoriz
     $('#activity-log-older').addEventListener('click', () => { void loadLogs(true).catch(error) })
     $('#activity-log-latest').addEventListener('click', () => { void loadLogs().catch(error) })
     document.addEventListener('visibilitychange', () => { if (state.active && document.visibilityState === 'visible') void refresh() })
-    return { open() { state.active = true; void refresh() }, today() { state.day = ''; state.runId = ''; state.followLatest = true },
-        selectRun(run) { state.day = run.day; state.runId = run.id; state.followLatest = false; state.logs = []; state.nextBefore = null; state.revision = ''; state.history = false }, stop }
+    return { open() { state.active = true; void refresh() }, today() { state.day = ''; state.followToday = true; state.runId = ''; state.followLatest = true },
+        selectRun(run) { state.day = run.day; state.followToday = false; state.runId = run.id; state.followLatest = false; state.logs = []; state.nextBefore = null; state.revision = ''; state.history = false }, stop }
 }

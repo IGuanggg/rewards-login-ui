@@ -409,15 +409,32 @@
                                                         <button class="ghost-btn" type="button" data-reveal="f-password">显示</button>
                                                     </span>
                                                 </label>
+                                                <label class="check-row check-row--sub" id="f-remove-password-wrap" hidden>
+                                                    <input type="checkbox" id="f-remove-password" />
+                                                    <span>清除已保存的密码（改用无密码会话登录）</span>
+                                                </label>
                                                 <label class="field">
                                                     <span class="field__label">TOTP 密钥 <i>可选</i></span>
                                                     <span class="field__control field__control--mono">
                                                         <input id="f-totp" name="totpSecret" type="text" spellcheck="false" placeholder="验证器密钥" />
                                                     </span>
                                                 </label>
+                                                <label class="check-row check-row--sub" id="f-remove-totp-wrap" hidden>
+                                                    <input type="checkbox" id="f-remove-totp" />
+                                                    <span>清除已保存的 TOTP 密钥</span>
+                                                </label>
                                                 <label class="field">
                                                     <span class="field__label">备用邮箱 <i>可选</i></span>
                                                     <span class="field__control"><input id="f-recovery" name="recoveryEmail" type="email" spellcheck="false" placeholder="recovery@example.com" /></span>
+                                                </label>
+                                                <label class="check-row check-row--sub" id="f-remove-recovery-wrap" hidden>
+                                                    <input type="checkbox" id="f-remove-recovery" />
+                                                    <span>清除已保存的备用邮箱</span>
+                                                </label>
+                                                <p class="proxy-saved" id="f-proxy-current" hidden></p>
+                                                <label class="check-row check-row--sub" id="f-remove-proxy-wrap" hidden>
+                                                    <input type="checkbox" id="f-remove-proxy" />
+                                                    <span>清除已保存的代理</span>
                                                 </label>
                                                 <div class="field-row">
                                                     <label class="field">
@@ -506,7 +523,7 @@
                                         </table>
                                     </div>
                                     <details class="activity-raw" id="activity-raw">
-                                        <summary>原始运行日志</summary>
+                                        <summary id="activity-raw-summary">本轮签到原始日志</summary>
                                         <div class="activity-log-toolbar">
                                             <label>级别
                                                 <select id="activity-log-level">
@@ -514,6 +531,7 @@
                                                     <option value="warn">警告</option>
                                                     <option value="error">错误</option>
                                                     <option value="info">信息</option>
+                                                    <option value="debug">调试</option>
                                                 </select>
                                             </label>
                                             <button class="ghost-btn ghost-btn--bordered" id="activity-log-older" type="button" hidden>更早</button>
@@ -525,11 +543,11 @@
                                 </div>
                             </section>
 
-                            <details class="card card--logs-collapse">
+                            <details class="card card--logs-collapse card--logs-collapse--muted" id="auth-logs-card">
                                 <summary class="card__head">
                                     <div>
-                                        <h2>账号授权实时日志</h2>
-                                        <p class="muted" id="logs-hint">等待连接…</p>
+                                        <h2>账号授权浏览器日志</h2>
+                                        <p class="muted" id="logs-hint">仅显示账号登录/授权窗口输出，与上方签到任务日志无关</p>
                                     </div>
                                     <span class="chev" aria-hidden="true"></span>
                                 </summary>
@@ -836,7 +854,7 @@
                         <p class="platform-hint" id="platform-hint"></p>
                     </div>
 
-                    <label class="check-row">
+                    <label class="check-row" id="opt-fresh-row">
                         <input type="checkbox" id="opt-fresh" />
                         <span>忽略旧 Cookie 重新登录（--fresh）</span>
                     </label>
@@ -864,8 +882,12 @@
                 </div>
 
                 <footer class="dialog__foot">
-                    <button class="ghost-btn ghost-btn--danger" id="btn-stop-login" type="button" hidden>终止授权</button>
+                    <button class="ghost-btn ghost-btn--danger dialog__foot-spacer" id="btn-stop-login" type="button" hidden>终止授权</button>
+                    <button class="ghost-btn ghost-btn--bordered dialog__foot-spacer" id="btn-reauth-login" type="button" hidden>重新授权</button>
+                    <button class="ghost-btn ghost-btn--bordered" id="btn-login-run-now" type="button" hidden>立即运行签到</button>
+                    <button class="ghost-btn ghost-btn--bordered" id="btn-login-close" type="button" hidden>关闭</button>
                     <button class="liquid-btn liquid-btn--solid" id="btn-start-login" type="button"><span class="liquid-btn__text">启动浏览器授权</span></button>
+                    <button class="liquid-btn liquid-btn--solid" id="btn-login-done" type="button" hidden><span class="liquid-btn__text">完成</span></button>
                 </footer>
             </div>
         </dialog>

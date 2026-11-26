@@ -9,7 +9,8 @@ import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { ActivityStore } from '../lib/activity-store.mjs'
-import { readTaskSettings, writeTaskSettings, readSchedule, scheduleDate } from '../lib/task-settings.mjs'
+import { readTaskSettings, writeTaskSettings, readSchedule, nextSchedule, scheduleDate, scheduleMarkerFile } from '../lib/task-settings.mjs'
+import { DatabaseSync } from 'node:sqlite'
 
 function fixture(t, registerCleanup = true) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'panel-run-test-'))
@@ -53,6 +54,26 @@ test('task settings validate before writing, preserve credentials and persist sc
     const reset = writeTaskSettings(dir, panel, { ...body, queryMode: 'default' }, { scheduling: true })
     assert.equal(reset.queryMode, 'existing')
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'config.json'))).searchSettings.queryEngines, ['wikipedia'])
+
+    // Switching from china to existing must update query-mode.json instead of snapping back
+    fs.mkdirSync(path.join(dir, 'scripts/api'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'scripts/api/panel-china-version.json'), '{"version":1}')
+    const chinaSaved = writeTaskSettings(dir, panel, { ...body, queryMode: 'china' }, { scheduling: true })
+    assert.equal(chinaSaved.queryMode, 'china')
+    const backFromChina = writeTaskSettings(dir, panel, { ...body, queryMode: 'existing' }, { scheduling: true })
+    assert.notEqual(backFromChina.queryMode, 'china')
+
+    // Changing schedule runAt clears today's marker; unchanged runAt preserves marker and shifts nextSchedule to next day
+    writeTaskSettings(dir, panel, { ...body, schedule: { enabled: true, runAt: '08:25' } }, { scheduling: true })
+    const marker = scheduleMarkerFile(panel)
+    const todayLocal = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(Date.now())
+    fs.writeFileSync(marker, todayLocal)
+    const shifted = nextSchedule({ enabled: true, runAt: '23:59', timezone: 'Asia/Shanghai' }, Date.parse(`${todayLocal}T01:00:00+08:00`), todayLocal)
+    assert.notEqual(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(Date.parse(shifted)), todayLocal)
+    writeTaskSettings(dir, panel, { ...body, schedule: { enabled: true, runAt: '08:25' } }, { scheduling: true })
+    assert.equal(fs.existsSync(marker), true, 'unchanged runAt preserves same-day marker')
+    writeTaskSettings(dir, panel, { ...body, schedule: { enabled: true, runAt: '14:30' } }, { scheduling: true })
+    assert.equal(fs.existsSync(marker), false, 'changed runAt clears same-day marker so rescheduled run executes')
 })
 
 test('authenticated UI API starts selected accounts, reports real state and stops; unsafe or unready requests do not start', async t => {
@@ -123,11 +144,55 @@ test('authenticated UI API starts selected accounts, reports real state and stop
     status = await (await request('/api/control/status')).json()
     assert.equal(status.state, 'running'); assert.equal(status.run.currentAccount, 'sample@example.invalid')
     assert.equal((await request('/api/control/start', {})).status, 409)
-    assert.equal((await request('/api/task-settings', next, 'PUT')).status, 409)
+    const busyTaskRes = await request('/api/task-settings', next, 'PUT')
+    assert.equal(busyTaskRes.status, 409)
+    assert.match((await busyTaskRes.json()).error, /修改签到设置/)
+    assert.equal((await request('/api/accounts', { index: 3, email: 'sample@example.invalid' }, 'POST')).status, 409)
+    assert.equal((await fetch(base + '/api/accounts/3', { method: 'DELETE', headers: { Cookie: cookie } })).status, 409)
     assert.equal(starts, 1)
     assert.equal((await request('/api/control/stop', {})).status, 202); assert.equal(stops, 1)
-    fs.writeFileSync(path.join(dir, '.env'), 'ACCOUNT_3_EMAIL=sample@example.invalid\n')
+
+    // Passwordless account with only mobile session fails desktop readiness & reports partialSession on dashboard
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+        headless: true, clusters: 1, sessionPath: 'sessions',
+        workers: { doDailyCheckIn: true, doDesktopSearch: true },
+        searchSettings: { searchDelay: { min: '30sec', max: '1min' }, queryEngines: ['wikipedia'], parallelSearching: false },
+        accountDelay: { min: '1min', max: '3min' }, contintueOnBotWarning: false, skipNonPointTasks: true
+    }))
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true })
+    const sdb = new DatabaseSync(path.join(dir, 'sessions/sessions.db'))
+    sdb.exec('CREATE TABLE IF NOT EXISTS sessions (email TEXT NOT NULL, platform TEXT NOT NULL, storage_state TEXT, updated_at INTEGER NOT NULL, PRIMARY KEY (email, platform))')
+    sdb.prepare('INSERT INTO sessions (email, platform, storage_state, updated_at) VALUES (?,?,?,?)').run('sample@example.invalid', 'mobile', JSON.stringify({ cookies: [{ name: 'c', value: 'v' }] }), Date.now())
+    sdb.close()
+    // Clear password via API removePassword flag
+    const clearedAcc = await request('/api/accounts', { index: 3, email: 'sample@example.invalid', removePassword: true }, 'POST')
+    assert.equal(clearedAcc.status, 200)
+    assert.equal((await clearedAcc.json()).accounts[0].hasPassword, false)
+    const dashPartial = await (await request('/api/dashboard')).json()
+    assert.equal(dashPartial.accounts[0].savedSession, false)
+    assert.equal(dashPartial.accounts[0].partialSession, true)
+    assert.equal(dashPartial.accounts[0].mobileSaved, true)
+    assert.equal(dashPartial.accounts[0].desktopSaved, false)
     const blocked = await request('/api/control/start', {})
-    assert.equal(blocked.status, 422); assert.equal((await blocked.json()).action, 'login')
+    assert.equal(blocked.status, 422)
+    const blockedBody = await blocked.json()
+    assert.equal(blockedBody.action, 'login')
+    assert.match(blockedBody.error, /电脑端/)
     assert.equal(starts, 1)
+
+    // Password change reports envManaged and invalidates other session cookies
+    const secondLogin = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+    const otherCookie = secondLogin.headers.get('set-cookie').split(';')[0]
+    const pwRes = await fetch(base + '/api/auth/password', { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: 'new-token-123456' }) })
+    assert.equal(pwRes.status, 200)
+    const pwBody = await pwRes.json()
+    assert.equal(pwBody.envManaged, true)
+    const refreshedCookie = pwRes.headers.get('set-cookie').split(';')[0]
+    assert.equal((await fetch(base + '/api/state', { headers: { Cookie: otherCookie } })).status, 401, 'old cookie from another device must be invalidated')
+    const stateAfterPw = await fetch(base + '/api/state', { headers: { Cookie: refreshedCookie } })
+    assert.equal(stateAfterPw.status, 200)
+    assert.equal((await stateAfterPw.json()).passwordManagedByEnv, true)
+
+    // Malformed percent encoding returns 400 instead of 500
+    assert.equal((await fetch(base + '/%E0%A4%A')).status, 400)
 })

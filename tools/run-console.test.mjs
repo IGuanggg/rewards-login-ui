@@ -47,6 +47,26 @@ test('last result survives reload and failed login offers the affected account',
     view = runView({ ...ready(), lastExit: { code: 75, at: new Date().toISOString() } })
     assert.equal(view.action, 'settings')
     assert.match(view.description, /75/)
+    view = runView({ ...ready(), latest: { run: { id: 'c1', state: 'cancelled', startedAt: Date.now() - 10000, endedAt: Date.now(), points: 30, accounts: [{ email: 'sample@example.invalid', error: 'Run cancelled' }] }, tasks: [] } })
+    assert.equal(view.tone, 'idle')
+    assert.equal(view.badge, '已停止')
+    assert.equal(view.action, 'logs')
+    assert.doesNotMatch(view.hint, /Run cancelled/)
+    view = runView({
+        ...ready(),
+        latest: {
+            run: {
+                id: 'm1', state: 'partial', startedAt: Date.now() - 10000, endedAt: Date.now(), points: 0,
+                accounts: [
+                    { email: 'first@example.invalid', error: 'Punchcard data unavailable' },
+                    { email: 'third@example.invalid', error: 'Login failed at SIGN_IN_METHOD_PICKER' }
+                ]
+            },
+            tasks: []
+        }
+    })
+    assert.equal(view.action, 'login')
+    assert.equal(view.email, 'third@example.invalid')
 })
 
 test('UI immediately disables duplicate starts and calls the actual stop endpoint', async t => {
@@ -84,4 +104,19 @@ test('UI immediately disables duplicate starts and calls the actual stop endpoin
     assert.equal(stops, 1)
     await new Promise(resolve => setImmediate(resolve))
     assert.equal(el('#btn-stop-run').hidden, true)
+
+    const seenErrors = []
+    const failing = createRunConsole({
+        api: async url => { if (url.endsWith('/start')) throw new Error('账号缺少电脑端会话'); return ready() },
+        onUnauthorized() { assert.fail('unexpected auth failure') },
+        onStart() {},
+        onAction() {},
+        onError(msg) { seenErrors.push(msg) }
+    })
+    t.after(() => failing.stop())
+    failing.open()
+    await new Promise(resolve => setImmediate(resolve))
+    await failing.start(2)
+    assert.equal(seenErrors.length, 1)
+    assert.match(seenErrors[0], /电脑端会话/)
 })

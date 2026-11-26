@@ -1,5 +1,6 @@
 const ACTIVE = new Set(['starting', 'running', 'stopping'])
 const LABELS = { completed: '本轮已完成', partial: '本轮部分完成', failed: '本轮运行失败', cancelled: '本轮已停止', interrupted: '上次运行被中断' }
+const LOGIN_ERR_RE = /login|sign.?in|authenticate|authentication|verification|captcha|登录|验证|会话/i
 export function waitMessage(delay, now = Date.now()) {
     if (!delay || !Number.isFinite(delay.seconds)) return null
     const since = typeof delay.sinceTs === 'number' ? delay.sinceTs : Date.parse(delay.sinceTs)
@@ -23,9 +24,10 @@ export function runView(info, { pending = null, error = null } = {}) {
     const tasks = sameRun ? latest?.tasks || [] : []
     const current = tasks.filter(task => task.state === 'running').sort((a, b) => b.updatedAt - a.updatedAt)[0]
     const failed = latest?.tasks?.find(task => ['failed', 'partial', 'incomplete'].includes(task.state))
-    const accountError = latest?.run?.accounts?.find(account => account.error)
+    const accountError = latest?.run?.accounts?.find(account => account.error && LOGIN_ERR_RE.test(account.error))
+        || latest?.run?.accounts?.find(account => account.error)
     const failure = accountError?.error || failed?.message || info?.lastExit?.error || ''
-    const loginError = /login|sign.?in|authenticate|authentication|verification|captcha|登录|验证|会话/i.test(failure)
+    const loginError = LOGIN_ERR_RE.test(failure)
     const newerExit = info?.lastExit && (!latest || Date.parse(info.lastExit.at) > (latest.run.endedAt || latest.run.updatedAt) + 15000)
     let view = {
         active, stopDisabled: !active || pending === 'stop' || live === 'stopping',
@@ -75,17 +77,23 @@ export function runView(info, { pending = null, error = null } = {}) {
             hint: failure || '可在任务记录或设置页排查退出原因。', action: 'settings', actionLabel: '检查环境' }
     } else if (latest) {
         const done = latest.run.state === 'completed'
-        view = { ...view, badge: done ? '已完成' : latest.run.state === 'running' ? '正在保存记录' : '需要关注', title: LABELS[latest.run.state] || '正在确认上次运行结果', tone: done ? 'success' : 'attention',
-            task: done ? '本轮任务已结束' : failed?.label || '查看本轮任务结果',
-            description: done ? '本轮积分与明细已记录。' : latest.run.state === 'cancelled' ? '已手动停止，已完成任务已保留。' : '部分任务未完成，可在记录页排查。',
-            hint: done ? '今日签到已完成。' : failure ? `问题：${failure}` : '打开任务记录可逐项查看执行结果。',
-            action: loginError ? 'login' : 'logs', actionLabel: loginError ? '重新登录账号' : '查看本轮记录', email: accountError?.email || failed?.account }
+        const cancelled = latest.run.state === 'cancelled'
+        view = { ...view,
+            badge: done ? '已完成' : cancelled ? '已停止' : latest.run.state === 'running' ? '正在保存记录' : '需要关注',
+            title: LABELS[latest.run.state] || '正在确认上次运行结果',
+            tone: done ? 'success' : cancelled ? 'idle' : 'attention',
+            task: done ? '本轮任务已结束' : cancelled ? '本轮已手动停止' : failed?.label || '查看本轮任务结果',
+            description: done ? '本轮积分与明细已记录。' : cancelled ? '已手动停止，已完成任务与已到账积分已保留。' : '部分任务未完成，可在记录页排查。',
+            hint: done ? '今日签到已完成。' : cancelled ? '随时可重新发起签到，或到任务记录查看已完成明细。' : failure ? `问题：${failure}` : '打开任务记录可逐项查看执行结果。',
+            action: !cancelled && loginError ? 'login' : 'logs',
+            actionLabel: !cancelled && loginError ? '重新登录账号' : '查看本轮记录',
+            email: accountError?.email || failed?.account }
     }
     if (error) view = { ...view, tone: 'attention', hint: error.message, action: error.action || 'refresh', actionLabel: { login: '去登录账号', accounts: '添加账号', settings: '检查环境' }[error.action] || '刷新状态', email: error.email || view.email }
     return view
 }
 
-export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
+export function createRunConsole({ api, onUnauthorized, onStart, onAction, onError }) {
     const $ = selector => document.querySelector(selector)
     let info, pending = null, error = null, timer, tick, active = false, fetching = false, queued = false, epoch = 0
     function render() {
@@ -117,28 +125,87 @@ export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
             button.disabled = runDisabled
             button.title = runTitle
         }
+        const authEmail = info?.authorization?.email?.toLowerCase() || ''
+        for (const item of document.querySelectorAll('#account-list .account-item')) {
+            const authBtn = item.querySelector?.('[data-act="authorize"]')
+            if (!authBtn) continue
+            const isAuth = Boolean(authEmail && String(item.dataset?.email || '').toLowerCase() === authEmail)
+            if (isAuth) {
+                if (!authBtn.dataset.origLabel) authBtn.dataset.origLabel = authBtn.textContent
+                authBtn.textContent = '授权进行中'
+            } else if (authBtn.dataset?.origLabel) {
+                authBtn.textContent = authBtn.dataset.origLabel
+                delete authBtn.dataset.origLabel
+            }
+        }
         const accountsBanner = $('#accounts-run-banner')
         if (accountsBanner) {
-            accountsBanner.hidden = !view.active
+            const authBusy = !view.active && Boolean(info?.authorization)
+            accountsBanner.hidden = !view.active && !authBusy
             const titleEl = $('#accounts-run-title')
             const descEl = $('#accounts-run-desc')
+            const viewBtn = $('#btn-accounts-view-run')
             const stopBtn = $('#btn-accounts-stop-run')
-            if (titleEl) titleEl.textContent = `${view.badge} · ${view.account}`
-            if (descEl) descEl.textContent = `${view.description}（运行期间无法单独运行账号或打开授权浏览器）`
-            if (stopBtn) {
-                stopBtn.disabled = view.stopDisabled
-                stopBtn.textContent = view.stopDisabled ? '正在停止…' : '停止运行'
+            if (view.active) {
+                if (titleEl) titleEl.textContent = `${view.badge} · ${view.account}`
+                if (descEl) descEl.textContent = `${view.description}（运行期间无法单独运行账号或打开授权浏览器）`
+                if (viewBtn) {
+                    viewBtn.textContent = '查看进度'
+                    viewBtn.onclick = () => onAction('dashboard', null, info)
+                }
+                if (stopBtn) {
+                    stopBtn.disabled = view.stopDisabled
+                    stopBtn.textContent = view.stopDisabled ? '正在停止…' : '停止运行'
+                    stopBtn.onclick = () => stopRun()
+                }
+            } else if (authBusy) {
+                if (titleEl) titleEl.textContent = `授权进行中 · ${info.authorization.email}`
+                if (descEl) descEl.textContent = '远程授权浏览器正在后台运行，期间无法启动签到或同时授权其他账号。'
+                if (viewBtn) {
+                    viewBtn.textContent = '回到授权窗口'
+                    viewBtn.onclick = () => onAction('login', info.authorization.email, info)
+                }
+                if (stopBtn) {
+                    stopBtn.disabled = false
+                    stopBtn.textContent = '终止授权'
+                    stopBtn.onclick = () => onAction('stop-auth', info.authorization.email, info)
+                }
             }
         }
         const loginBusy = $('#login-busy-banner')
         if (loginBusy) {
-            loginBusy.hidden = !view.active
+            const dlgEmail = String($('#dlg-login-sub')?.textContent || '').trim().toLowerCase()
+            const otherAuth = !view.active && Boolean(authEmail && dlgEmail && authEmail !== dlgEmail)
+            loginBusy.hidden = !view.active && !otherAuth
+            const busyHeading = loginBusy.querySelector?.('strong')
             const busyText = $('#login-busy-text')
             const loginStopBtn = $('#btn-login-stop-run')
-            if (busyText) busyText.textContent = `${view.description} 需先停止签到或等本轮结束后再启动授权。`
-            if (loginStopBtn) {
-                loginStopBtn.disabled = view.stopDisabled
-                loginStopBtn.textContent = view.stopDisabled ? '正在停止…' : '先停止签到'
+            if (view.active) {
+                if (busyHeading) busyHeading.textContent = '当前有后台签到正在运行'
+                if (busyText) busyText.textContent = `${view.description} 需先停止签到或等本轮结束后再启动授权。`
+                if (loginStopBtn) {
+                    loginStopBtn.disabled = view.stopDisabled
+                    loginStopBtn.textContent = view.stopDisabled ? '正在停止…' : '先停止签到'
+                    loginStopBtn.onclick = () => stopRun()
+                }
+            } else if (otherAuth) {
+                if (busyHeading) busyHeading.textContent = '另一个账号正在进行远程授权'
+                if (busyText) busyText.textContent = `账号 ${info.authorization.email} 正在占用授权浏览器，同一时间仅支持单个账号授权。`
+                if (loginStopBtn) {
+                    loginStopBtn.disabled = false
+                    loginStopBtn.textContent = '终止该授权'
+                    loginStopBtn.onclick = () => onAction('stop-auth', info.authorization.email, info)
+                }
+            }
+            const loginStartBtn = $('#btn-start-login')
+            if (loginStartBtn) {
+                if (view.active || otherAuth) {
+                    loginStartBtn.dataset.blockedByBusy = '1'
+                    loginStartBtn.disabled = true
+                } else if (loginStartBtn.dataset?.blockedByBusy) {
+                    delete loginStartBtn.dataset.blockedByBusy
+                    if ($('#job-status')?.dataset?.state !== 'running') loginStartBtn.disabled = false
+                }
             }
         }
     }
@@ -175,6 +242,7 @@ export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
         } catch (err) {
             if (err.status === 401) { stop(); onUnauthorized(); return }
             error = { message: `未能启动：${err.message}`, action: err.body?.action, email: err.body?.readiness?.loginRequired?.[0]?.email }
+            onError?.(error.message, err)
         } finally { epoch++; pending = null; render(); void refresh() }
     }
     async function stopRun() {
@@ -186,14 +254,13 @@ export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
         } catch (err) {
             if (err.status === 401) { stop(); onUnauthorized(); return }
             error = { message: `停止请求未确认：${err.message}。请刷新状态确认脚本是否仍在运行。` }
+            onError?.(error.message, err)
         } finally { epoch++; pending = null; render(); void refresh() }
     }
     function stop() { active = false; epoch++; queued = false; clearTimeout(timer); clearInterval(tick) }
     document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(timer); else if (active) void refresh() })
     $('#btn-run-all').addEventListener('click', () => start())
     $('#btn-stop-run').addEventListener('click', stopRun)
-    $('#btn-accounts-stop-run')?.addEventListener('click', stopRun)
-    $('#btn-login-stop-run')?.addEventListener('click', stopRun)
     $('#btn-run-records').addEventListener('click', () => onAction('logs', null, info))
     return { start, stopRun, refresh, render, stop, isActive: () => ACTIVE.has(info?.state) || Boolean(pending), open() { active = true; clearInterval(tick); tick = setInterval(() => { if (!document.hidden && ACTIVE.has(info?.state)) render() }, 1000); void refresh() } }
 }

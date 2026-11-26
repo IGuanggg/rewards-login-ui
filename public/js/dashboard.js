@@ -91,6 +91,7 @@ export function createDashboard({ api, escapeHtml: esc, onUnauthorized }) {
             const data = await api('/api/dashboard')
             if (!active || generation !== version) return
             const saved = data.accounts.filter(account => account.savedSession).length
+            const partial = data.accounts.filter(account => account.partialSession).length
             $('#dash-attention').closest('.stat-card').dataset.color = data.attention ? 'red' : 'neutral'
             const balances = data.accounts.filter(account => account.balance != null)
             for (const [id, value] of Object.entries({
@@ -107,7 +108,7 @@ export function createDashboard({ api, escapeHtml: esc, onUnauthorized }) {
                 'dash-schedule-last': data.schedule.last ? `${data.schedule.last.day} ${data.schedule.last.reason}` : '暂无记录',
                 'dash-version': `面板 ${data.panelVersion} / 内核 ${data.upstreamVersion || '未连接'}`,
                 'dash-balance-note': `${balances.length}/${data.accounts.length} 个账号已同步`,
-                'dash-session-note': `${saved}/${data.accounts.length} 就绪`
+                'dash-session-note': partial ? `${saved}/${data.accounts.length} 双端就绪 · ${partial} 仅单端` : `${saved}/${data.accounts.length} 就绪`
             })) {
                 const el = $(`#${id}`)
                 if (el) el.textContent = value
@@ -118,10 +119,14 @@ export function createDashboard({ api, escapeHtml: esc, onUnauthorized }) {
                 .join('')
             $('#dash-account-body').innerHTML = data.accounts.length
                 ? data.accounts
-                      .map(
-                          account =>
-                              `<tr><td class="cell-email">${esc(account.email)}</td><td><span class="tag ${account.savedSession ? 'tag--ok' : 'tag--warn'}">${account.savedSession ? '已保存' : '待登录'}</span></td><td class="num${Number(account.todayPoints) > 0 ? ' cell-gain' : ''}">${fmtGain(account.todayPoints)}</td><td class="num cell-balance">${fmtNum(account.balance)}</td><td class="cell-time">${fmtTime(account.balanceAt)}</td></tr>`
-                      )
+                      .map(account => {
+                          const sessionTag = account.savedSession
+                              ? '<span class="tag tag--ok">已保存</span>'
+                              : account.partialSession
+                                ? `<span class="tag tag--warn">${account.mobileSaved === false ? '缺手机端' : '缺电脑端'}</span>`
+                                : '<span class="tag tag--warn">待登录</span>'
+                          return `<tr><td class="cell-email">${esc(account.email)}</td><td>${sessionTag}</td><td class="num${Number(account.todayPoints) > 0 ? ' cell-gain' : ''}">${fmtGain(account.todayPoints)}</td><td class="num cell-balance">${fmtNum(account.balance)}</td><td class="cell-time">${fmtTime(account.balanceAt)}</td></tr>`
+                      })
                       .join('')
                 : '<tr><td colspan="5" class="activity-table-empty">还没有账号，请前往「账号」页添加并登录。</td></tr>'
             $('#dash-error').hidden = true
