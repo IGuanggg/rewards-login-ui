@@ -50,11 +50,17 @@ try {
     console.log('\nPASS durable activity journal, real upstream parser, task points, and split UTF-8 output')
     const fixture = path.join(dir, 'synthetic-bot')
     fs.mkdirSync(path.join(fixture, 'dist'), { recursive: true })
-    fs.mkdirSync(path.join(fixture, 'scripts/api'), { recursive: true })
     fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}')
     fs.writeFileSync(path.join(fixture, 'config.json'), '{"sessionPath":"sessions","searchSettings":{}}')
     fs.writeFileSync(path.join(fixture, 'dist/index.js'), emitter)
-    fs.copyFileSync('/opt/rewards/scripts/api/logParser.js', path.join(fixture, 'scripts/api/logParser.js'))
+    if (fs.existsSync('/opt/rewards/dist/control-api/logs/parse.js')) {
+        for (const rel of ['dist/control-api', 'dist/logging', 'dist/rewards', 'scripts/lib']) {
+            if (fs.existsSync(path.join('/opt/rewards', rel))) fs.cpSync(path.join('/opt/rewards', rel), path.join(fixture, rel), { recursive: true })
+        }
+    } else {
+        fs.mkdirSync(path.join(fixture, 'scripts/api'), { recursive: true })
+        fs.copyFileSync('/opt/rewards/scripts/api/logParser.js', path.join(fixture, 'scripts/api/logParser.js'))
+    }
     const workerFile = path.join(dir, 'worker-activity.db')
     const worker = spawn(process.execPath, [fileURLToPath(new URL('./worker.mjs', import.meta.url)), 'bot'], {
         env: { ...process.env, BOT_DIR: fixture, PANEL_ACTIVITY_DB: workerFile }, stdio: 'ignore'

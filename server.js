@@ -23,7 +23,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { createDesktopProxy } from './lib/desktop-proxy.mjs'
 import { ActivityStore, activityFile, redactLog } from './lib/activity-store.mjs'
 import { readTaskSettings, writeTaskSettings, readSchedule } from './lib/task-settings.mjs'
-import { notificationView, saveNotifications } from './lib/notifications.mjs'
+import { notificationView, saveNotifications, sendTestNotification, formatRunNotification, samplePreviewRun } from './lib/notifications.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, 'public')
@@ -250,14 +250,20 @@ function recordFailure(ip) {
 
 /* ────────────────────────── 上游仓库校验 ────────────────────────── */
 
-const BOT_MARKERS = ['scripts/main/manualLogin.js', 'scripts/utils.js', 'package.json']
+const BOT_MARKERS = ['scripts/main/manualLogin.js', 'package.json']
+
+function isV5RepoDir(dir, pkg) {
+    if (fs.existsSync(path.join(dir, 'scripts', 'lib', 'commandUtils.js'))) return true
+    if (fs.existsSync(path.join(dir, 'dist', 'control-api', 'server.js'))) return true
+    return Number(String(pkg?.version || '').split('.')[0]) >= 5
+}
 
 /**
- * 严格判定一个目录是否是上游 Microsoft-Rewards-Script 仓库。
- * 返回 { ok, dir, missing, pkg }
+ * 严格判定一个目录是否是上游 Microsoft-Rewards-Script 仓库（兼容 v4 / v5）。
+ * 返回 { ok, dir, missing, pkg, v5 }
  */
 function inspectBotRepo(dir) {
-    const result = { ok: false, dir: dir ? path.resolve(dir) : '', missing: [], pkg: null }
+    const result = { ok: false, dir: dir ? path.resolve(dir) : '', missing: [], pkg: null, v5: false }
     if (!result.dir) {
         result.missing.push('未填写路径')
         return result
@@ -277,6 +283,10 @@ function inspectBotRepo(dir) {
     for (const marker of BOT_MARKERS) {
         if (!fs.existsSync(path.join(result.dir, marker))) result.missing.push(marker)
     }
+    const hasLibUtils =
+        fs.existsSync(path.join(result.dir, 'scripts', 'lib', 'commandUtils.js')) ||
+        fs.existsSync(path.join(result.dir, 'scripts', 'utils.js'))
+    if (!hasLibUtils) result.missing.push('scripts/lib/commandUtils.js')
 
     const pkgPath = path.join(result.dir, 'package.json')
     if (fs.existsSync(pkgPath)) {
@@ -290,6 +300,7 @@ function inspectBotRepo(dir) {
         }
     }
 
+    result.v5 = isV5RepoDir(result.dir, result.pkg)
     result.ok = result.missing.length === 0
     return result
 }
@@ -804,7 +815,9 @@ function preflight(botDir) {
 
     if (inspection.ok) {
         const nodeModules = path.join(inspection.dir, 'node_modules')
-        const deps = ['patchright', 'fingerprint-generator', 'fingerprint-injector', 'otpauth', 'ghost-cursor-playwright-port']
+        const deps = inspection.v5
+            ? ['patchright', 'fingerprint-generator', 'fingerprint-injector', 'otpauth', 'ghost-cursor-patchright', 'impit']
+            : ['patchright', 'fingerprint-generator', 'fingerprint-injector', 'otpauth', 'ghost-cursor-playwright-port']
         const missing = deps.filter(dep => !fs.existsSync(path.join(nodeModules, dep)))
         checks.push({
             id: 'deps',
@@ -1390,7 +1403,7 @@ const server = http.createServer(async (req, res) => {
                 authenticated: isAuthenticated(req),
                 botDir,
                 repoSynced: Boolean(state.botDir) && inspectBotRepo(state.botDir).ok,
-                panelVersion: '2.0.0'
+                panelVersion: '2.2.0'
             })
         }
 
@@ -1661,12 +1674,27 @@ const server = http.createServer(async (req, res) => {
             let scheduleState = null
             try { scheduleState = JSON.parse(fs.readFileSync(path.join(path.dirname(CONFIG_FILE), 'schedule-state.json'), 'utf8')) } catch {}
             return json(res, 200, { ...history, accounts: current, schedule: { ...readSchedule(CONFIG_FILE), supported: REMOTE_DESKTOP, last: scheduleState },
-                queryMode: config.queryMode || 'existing', chinaSupported: config.chinaSupported || false, panelVersion: '2.1.0', upstreamVersion })
+                queryMode: config.queryMode || 'existing', chinaSupported: config.chinaSupported || false,
+                rewardsMode: config.rewardsMode || 'browser', ensureStreakProtection: config.ensureStreakProtection ?? null,
+                v5Supported: config.v5Supported || false, panelVersion: '2.2.0', upstreamVersion })
         }
-        if (pathname === '/api/notifications' && req.method === 'GET') return json(res, 200, { ...notificationView(CONFIG_FILE), supported: REMOTE_DESKTOP })
+        if (pathname === '/api/notifications' && req.method === 'GET') {
+            return json(res, 200, { ...notificationView(CONFIG_FILE), supported: true, autoSupported: REMOTE_DESKTOP })
+        }
         if (pathname === '/api/notifications' && req.method === 'PUT') {
-            if (!REMOTE_DESKTOP) return json(res, 422, { error: '结果通知目前由 Docker 工作进程发送，请在 Docker 面板中设置。' })
-            return json(res, 200, { ...saveNotifications(CONFIG_FILE, await readBody(req)), supported: true })
+            return json(res, 200, { ...saveNotifications(CONFIG_FILE, await readBody(req)), supported: true, autoSupported: REMOTE_DESKTOP })
+        }
+        if (pathname === '/api/notifications/preview' && req.method === 'GET') {
+            const provider = url.searchParams.get('provider') || notificationView(CONFIG_FILE).provider || 'pushplus'
+            if (!['pushplus', 'serverchan', 'bark'].includes(provider)) return json(res, 422, { error: '不支持的通知渠道' })
+            const sampleState = url.searchParams.get('state') || 'completed'
+            return json(res, 200, formatRunNotification(provider, samplePreviewRun(sampleState)))
+        }
+        if (pathname === '/api/notifications/test' && req.method === 'POST') {
+            const body = await readBody(req)
+            const sampleState = typeof body?.state === 'string' ? body.state : 'completed'
+            const sent = await sendTestNotification(CONFIG_FILE, { state: sampleState })
+            return json(res, 200, { ok: true, ...sent, supported: true, autoSupported: REMOTE_DESKTOP })
         }
         if (pathname === '/api/activity' && req.method === 'GET') {
             return json(res, 200, activity().day(url.searchParams.get('day') || undefined))

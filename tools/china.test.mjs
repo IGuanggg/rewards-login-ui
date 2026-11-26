@@ -115,3 +115,70 @@ test('waiting countdown uses reported start and next schedule follows Shanghai m
     assert.equal(nextSchedule({ enabled: true, runAt: '00:01', timezone: 'Asia/Shanghai' }, now), '2026-10-25T16:01:00.000Z')
     assert.equal(nextSchedule({ enabled: false }, now), null)
 })
+
+test('v5 upstream patcher injects QueryTopic adapters, parseDuration wait, and keeps config.json strict-clean', async t => {
+    const dir = scratch(t), panel = path.join(dir, 'panel.json')
+    fs.mkdirSync(path.join(dir, 'dist/control-api'), { recursive: true })
+    fs.mkdirSync(path.join(dir, 'dist/rewards/shared/query'), { recursive: true })
+    fs.mkdirSync(path.join(dir, 'dist/util'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'dist/control-api/server.js'), 'async function requestHandler(req, res) {\n    return true\n}\n')
+    const engineFile = path.join(dir, 'dist/rewards/shared/query/QueryEngine.js')
+    const sourcesFile = path.join(dir, 'dist/rewards/shared/query/QuerySources.js')
+    const utilsFile = path.join(dir, 'dist/util/Utils.js')
+    fs.writeFileSync(engineFile, 'exports.QueryEngine = class { constructor(bot) { this.bot = bot } async fetchTopics(options = {}) { return [{ text: "old" }] } };')
+    fs.writeFileSync(sourcesFile, "exports.QuerySources = class { getLocalQueryList(language = 'en') { return [{ text: 'old' }] } };")
+    fs.writeFileSync(utilsFile, 'exports.default = class { getSignal() { return undefined } parseDuration(v) { return Number(v) } async wait(time, signal = this.getSignal()) {} };')
+
+    const res = spawnSync(process.execPath, [fileURLToPath(new URL('../docker/prepare-upstream.mjs', import.meta.url)), dir], { encoding: 'utf8' })
+    assert.equal(res.status, 0, res.stderr)
+    assert.match(fs.readFileSync(path.join(dir, 'dist/control-api/server.js'), 'utf8'), /refreshAccountEnv\(projectRoot\)/)
+
+    const prevMode = process.env.PANEL_QUERY_MODE
+    try {
+        process.env.PANEL_QUERY_MODE = 'china-local'
+        const { QueryEngine } = await import(pathToFileURL(engineFile).href)
+        const { QuerySources } = await import(pathToFileURL(sourcesFile).href)
+        const bot = { isMobile: false, logger: { info() {} }, utils: { shuffleArray: a => [...a].reverse() } }
+        const topics = await new QueryEngine(bot).fetchTopics({ shuffle: true })
+        assert.equal(topics.length, LOCAL_TOPICS.length)
+        assert.equal(topics[0].country, 'CN')
+        assert.equal(topics[0].language, 'zh')
+        assert.equal(topics[0].text, LOCAL_TOPICS.at(-1))
+        const local = new QuerySources().getLocalQueryList('zh')
+        assert.equal(local[0].text, LOCAL_TOPICS[0])
+        assert.equal(local[0].kind, 'evergreen')
+
+        const uMod = await import(pathToFileURL(utilsFile).href)
+        const Utils = uMod.default?.default ?? uMod.default
+        const logs = [], origLog = console.log
+        console.log = msg => logs.push(msg)
+        try { await new Utils().wait(35000); await new Utils().wait(500) } finally { console.log = origLog }
+        assert.equal(logs.length, 1); assert.match(logs[0], /^__PANEL_WAIT__/)
+    } finally {
+        if (prevMode == null) delete process.env.PANEL_QUERY_MODE; else process.env.PANEL_QUERY_MODE = prevMode
+    }
+
+    // v5 task settings write strict schema fields (rewardsMode, ensureStreakProtection, taskDelay, continueOnBotWarning) without panelQueryMode
+    const v5Cfg = {
+        rewardsMode: 'browser', ensureStreakProtection: false, continueOnBotWarning: false, skipNonPointTasks: true,
+        accountDelay: { min: '60sec', max: '120sec' }, taskDelay: { min: '15sec', max: '30sec' },
+        workers: { doDailyCheckIn: true }, searchSettings: { queryEngines: ['google'], searchDelay: { min: '30sec', max: '60sec' }, readDelay: { min: '30sec', max: '60sec' } }
+    }
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(v5Cfg))
+    const saved = writeTaskSettings(dir, panel, {
+        workers: { doDailyCheckIn: true }, rewardsMode: 'api', ensureStreakProtection: true,
+        taskDelay: { min: 10, max: 25 }, searchDelay: { min: 120, max: 240 }, readDelay: { min: 60, max: 120 },
+        accountDelay: { min: 60, max: 180 }, queryMode: 'china', stopOnWarning: true, skipNonPointTasks: true
+    })
+    assert.equal(saved.v5Supported, true)
+    assert.equal(saved.rewardsMode, 'api')
+    assert.equal(saved.ensureStreakProtection, true)
+    assert.deepEqual(saved.taskDelay, { min: 10, max: 25 })
+    assert.equal(saved.queryMode, 'china')
+    const written = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'))
+    assert.equal(written.rewardsMode, 'api')
+    assert.equal(written.ensureStreakProtection, true)
+    assert.equal(written.continueOnBotWarning, false)
+    assert.equal('contintueOnBotWarning' in written, false)
+    assert.equal('panelQueryMode' in written, false)
+})

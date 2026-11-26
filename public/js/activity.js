@@ -78,7 +78,7 @@ export function createActivityPanel({ api, escapeHtml: esc, timeOf, onUnauthoriz
             $('#activity-tasks').textContent = data.summary.tasks
             $('#activity-points').textContent = data.summary.points ?? '—'
             $('#activity-attention').textContent = (data.summary.attention || 0) + (data.summary.failedRuns || 0)
-            $('#activity-note').textContent = `${data.day === data.today ? '今天' : data.day} · ${data.timezone} · 按启动日期归档，保留 ${data.retentionDays} 天。积分仅显示脚本明确汇报的值；“—”表示未汇报。`
+            $('#activity-note').textContent = `${data.day === data.today ? '今天' : data.day} · ${data.timezone} · 保留最近 ${data.retentionDays} 天`
             $('#activity-empty').hidden = data.runs.length > 0
             $('#activity-detail').hidden = !data.runs.length
             const previous = state.runId

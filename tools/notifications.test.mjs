@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { notificationConfig, notificationView, saveNotifications, notifyRun } from '../lib/notifications.mjs'
+import { notificationConfig, notificationView, saveNotifications, notifyRun, formatRunNotification, sendTestNotification } from '../lib/notifications.mjs'
 
 const tempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'rewards-notify-'))
 const DEVICE_KEY = 'AbCdEfGh1234567890XyZ'
@@ -88,4 +88,64 @@ test('bark: 未配置服务器时跳过推送', async () => {
 test('其他渠道仍拒绝非法 provider', () => {
     const dir = tempDir(), panelFile = path.join(dir, 'config.json')
     assert.throws(() => saveNotifications(panelFile, { provider: 'telegram', enabled: true, onlyProblems: false, token: DEVICE_KEY }), error => error.status === 422)
+})
+
+test('pushplus: 使用 HTML 卡片模板、正确脱敏邮箱并转义特殊字符', async () => {
+    const dir = tempDir(), panelFile = path.join(dir, 'config.json')
+    saveNotifications(panelFile, { provider: 'pushplus', enabled: true, onlyProblems: false, token: DEVICE_KEY })
+    let sent = null
+    const fetcher = async (url, options) => { sent = { url, body: JSON.parse(options.body) }; return { ok: true, json: async () => ({ code: 200 }) } }
+    await notifyRun(panelFile, {
+        day: '2026-11-26', state: 'completed', startedAt: 1000, endedAt: 126000, points: 315,
+        accounts: [{ email: '<b>daily</b>@outlook.com', success: true, collectedPoints: 165, finalPoints: 8420 }],
+        taskSummary: { total: 14, completed: 12, skipped: 2, attention: 0 }
+    }, { fetcher })
+    assert.equal(sent.body.template, 'html')
+    assert.match(sent.body.content, /\+315 分/)
+    assert.match(sent.body.content, /8,420/)
+    assert.match(sent.body.content, /2 分 5 秒/)
+    assert.ok(!sent.body.content.includes('<b>daily</b>@outlook.com'), '完整邮箱不得泄露')
+    assert.ok(!sent.body.content.includes('<b>'), 'HTML 标签必须被转义')
+})
+
+test('serverchan: 生成结构化 Markdown 报表与账号表格', () => {
+    const formatted = formatRunNotification('serverchan', {
+        day: '2026-11-26', state: 'partial', startedAt: 0, endedAt: 65000, points: 165,
+        accounts: [
+            { email: 'alice@outlook.com', success: true, collectedPoints: 165, finalPoints: 8420 },
+            { email: 'bob@outlook.com', success: false, collectedPoints: 0, finalPoints: 6030, error: 'cookie expired' }
+        ]
+    })
+    assert.equal(formatted.format, 'markdown')
+    assert.match(formatted.content, /\| # \| 账号 \| 状态 \| 本轮得分 \| 当前余额 \|/)
+    assert.match(formatted.content, /ali\*\*\*@outlook\.com/)
+    assert.match(formatted.content, /待排查/)
+    assert.ok(!formatted.content.includes('alice@outlook.com'))
+    assert.ok(!formatted.content.includes('cookie expired'))
+})
+
+test('bark: 异常状态自动升级为 timeSensitive 并带副标题', async () => {
+    const dir = tempDir(), panelFile = path.join(dir, 'config.json')
+    saveNotifications(panelFile, { provider: 'bark', enabled: true, onlyProblems: false, token: DEVICE_KEY, server: SERVER })
+    let sent = null
+    const fetcher = async (url, options) => { sent = JSON.parse(options.body); return { ok: true, json: async () => ({ code: 200 }) } }
+    await notifyRun(panelFile, { day: '2026-11-26', state: 'failed', points: 0, accounts: [{ email: 'ab@outlook.com', success: false }] }, { fetcher })
+    assert.equal(sent.level, 'timeSensitive')
+    assert.match(sent.subtitle, /2026-11-26/)
+    assert.ok(!sent.body.includes('ab@outlook.com'), '短邮箱名也必须脱敏')
+    assert.match(sent.body, /a\*\*\*@outlook\.com/)
+})
+
+test('sendTestNotification: 未保存密钥报错 422，已保存可发送测试推送并记录', async () => {
+    const dir = tempDir(), panelFile = path.join(dir, 'config.json')
+    await assert.rejects(() => sendTestNotification(panelFile, { fetcher: () => { throw new Error('unexpected') } }), error => error.status === 422)
+    saveNotifications(panelFile, { provider: 'pushplus', enabled: false, onlyProblems: false, token: DEVICE_KEY })
+    let captured = null
+    const fetcher = async (url, options) => { captured = JSON.parse(options.body); return { ok: true, json: async () => ({ code: 200 }) } }
+    const result = await sendTestNotification(panelFile, { state: 'partial', fetcher })
+    assert.equal(result.sent, true)
+    assert.match(captured.title, /测试推送/)
+    assert.equal(captured.template, 'html')
+    assert.equal(result.view.last.state, 'sent')
+    assert.equal(result.view.last.test, true)
 })

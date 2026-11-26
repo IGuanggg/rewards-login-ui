@@ -12,7 +12,7 @@ import { createNotifications } from './notifications.js'
 const $ = (selector, root = document) => root.querySelector(selector)
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)]
 
-const LS = { theme: 'rwd.theme' }
+const LS = { theme: 'rwd.theme.v4' }
 
 const state = {
     authRequired: true,
@@ -43,7 +43,7 @@ const runConsole = createRunConsole({ api,
     onStart: index => { activityPanel.today(); toast('success', index == null ? '已提交全部账号签到，运行进度会自动更新' : '已提交该账号签到，运行进度会自动更新') },
     onAction: (action, email, info) => {
         if (action === 'logs') { if (info?.latest) activityPanel.selectRun(info.latest.run); else activityPanel.today(); $('#tabs [data-tab="logs"]').click(); return }
-        if (action === 'settings') { $('#tabs [data-tab="settings"]').click(); return }
+        if (action === 'settings') { selectSettingsTab('system'); $('#tabs [data-tab="settings"]').click(); return }
         if (action === 'desktop' && info?.authorization?.desktopUrl) { window.open(info.authorization.desktopUrl, '_blank', 'noopener'); return }
         $('#tabs [data-tab="accounts"]').click()
         if (action === 'accounts') { $('#btn-add-account').click(); return }
@@ -73,7 +73,7 @@ async function api(pathname, { method = 'GET', body } = {}) {
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(12000)
     }).catch(error => {
-        if (error.name === 'TimeoutError' || error.name === 'AbortError') throw new Error('请求超时，请刷新状态确认结果后重试')
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') throw new Error('请求超时，请重试')
         throw error
     })
     let data = {}
@@ -184,9 +184,9 @@ function showApp() {
     showView('app')
     runConsole.open()
     if ($('#tabs .is-active')?.dataset.tab === 'dashboard') dashboard.open()
-    $('#topbar-path').textContent = '中国大陆 · 签到工作台'
+    $('#topbar-path').textContent = '中国大陆'
     $('#topbar-path').title = state.botDir
-    $('#appfoot-path').textContent = '配置、会话与运行记录保存在实例数据目录'
+    $('#appfoot-path').textContent = 'v5.0 内核适配'
     $('#appfoot-path').title = state.botDir
     $('#s-botdir').value = state.botDir
     $('#s-control-api').value = state.control?.base || ''
@@ -370,8 +370,8 @@ async function refreshState() {
         if (clearBox && !hasControlToken) clearBox.checked = false
 
         $('#s-auth-note').textContent = info.authRequired
-            ? '已启用访问密码；修改后需重新登录。'
-            : '⚠ 已用 PANEL_NO_AUTH 关闭鉴权，任何能访问本端口的人都能读写账号配置。'
+            ? '修改密码后需重新登录。'
+            : '已通过 PANEL_NO_AUTH 关闭密码验证。'
         $('#s-auth-note').dataset.tone = info.authRequired ? 'muted' : 'bad'
 
         const preflight = await api('/api/preflight').catch(() => null)
@@ -406,8 +406,8 @@ function applyAccounts(payload) {
     const hint = $('#accounts-hint')
     const sessions = payload.sessions || {}
     hint.textContent = payload.envExists
-        ? `${payload.accounts?.length || 0} 个账号 · 登录信息保存在本机`
-        : '添加第一个账号，开始连接'
+        ? `${payload.accounts?.length || 0} 个账号`
+        : '添加第一个账号开始使用'
     hint.title = payload.envPath || ''
     if (sessions.configured && sessions.configured !== 'sessions') {
         hint.textContent += ` · 会话目录 config.sessionPath=${sessions.configured}`
@@ -429,12 +429,26 @@ async function refreshAccounts() {
     }
 }
 
-function sessionBadge(label, session) {
-    if (!session) {
-        return `<span class="session-chip" data-ok="false"><i></i>${label} · 未连接</span>`
+function sessionTile(label, session) {
+    const ok = Boolean(session?.cookies)
+    if (!ok) {
+        return `<div class="session-tile" data-ok="false">
+            <span class="session-tile__dot" aria-hidden="true"></span>
+            <div class="session-tile__body">
+                <strong>${label}</strong>
+                <span>未登录</span>
+            </div>
+        </div>`
     }
-    const detail = session.updatedAt ? ago(session.updatedAt) : `${session.cookies ?? 0} cookies`
-    return `<span class="session-chip" data-ok="true" title="${label}已保存 · ${session.cookies ?? '?'} cookies"><i></i>${label} · ${escapeHtml(detail)}</span>`
+    const when = session.updatedAt ? ago(session.updatedAt) : '已保存'
+    const detail = `${when} · ${session.cookies} CK`
+    return `<div class="session-tile" data-ok="true" title="${label}已保存 · ${session.cookies} cookies">
+        <span class="session-tile__dot" aria-hidden="true"></span>
+        <div class="session-tile__body">
+            <strong>${label}</strong>
+            <span>${escapeHtml(detail)}</span>
+        </div>
+    </div>`
 }
 
 function renderAccounts() {
@@ -454,6 +468,7 @@ function renderAccounts() {
             const hasMobile = Boolean(account.sessions?.mobile?.cookies)
             const hasDesktop = Boolean(account.sessions?.desktop?.cookies)
             const connected = hasMobile || hasDesktop
+            const bothReady = hasMobile && hasDesktop
             const extra = [
                 account.hasPassword ? '已存密码' : '',
                 account.hasTotp ? '2FA' : '',
@@ -461,27 +476,25 @@ function renderAccounts() {
             ].filter(Boolean)
 
             return `<li class="account-item" data-index="${account.index}" data-email="${escapeHtml(account.email)}">
-                <span class="avatar" aria-hidden="true">${escapeHtml((account.email || '?').slice(0, 1).toUpperCase())}</span>
-                <div class="account-item__main">
-                    <div class="account-item__head">
+                <div class="account-item__top">
+                    <span class="avatar" aria-hidden="true">${escapeHtml((account.email || '?').slice(0, 1).toUpperCase())}</span>
+                    <div class="account-item__main">
                         <div class="account-item__email" title="${escapeHtml(account.email)}">${escapeHtml(account.email)}</div>
-                        ${extra.map(label => `<span class="meta-chip">${escapeHtml(label)}</span>`).join('')}
-                    </div>
-                    <div class="account-item__sessions">
-                        ${sessionBadge('手机端', account.sessions?.mobile)}
-                        ${sessionBadge('电脑端', account.sessions?.desktop)}
+                        <div class="account-item__tags">
+                            <span class="meta-chip">#${account.index}</span>
+                            ${extra.map(label => `<span class="meta-chip">${escapeHtml(label)}</span>`).join('')}
+                        </div>
                     </div>
                 </div>
+                <div class="account-item__sessions">
+                    ${sessionTile('手机端', account.sessions?.mobile)}
+                    ${sessionTile('电脑端', account.sessions?.desktop)}
+                </div>
                 <div class="account-item__actions">
-                    <button class="mini-btn" data-act="run">运行签到</button>
-                    <button class="mini-btn mini-btn--accent" data-act="authorize">${connected ? (hasMobile && hasDesktop ? '重新登录' : '补全登录') : '登录账号'}</button>
-                    <details class="more">
-                        <summary aria-label="更多操作">更多</summary>
-                        <div class="more__menu">
-                            <button type="button" data-act="edit">编辑配置</button>
-                            <button type="button" class="is-danger" data-act="delete">删除账号</button>
-                        </div>
-                    </details>
+                    <button class="mini-btn" type="button" data-act="run">运行签到</button>
+                    <button class="mini-btn${bothReady ? '' : ' mini-btn--primary'}" type="button" data-act="authorize">${connected ? (bothReady ? '管理登录' : '补全登录') : '登录账号'}</button>
+                    <button class="mini-btn mini-btn--ghost mini-btn--spacer" type="button" data-act="edit">编辑</button>
+                    <button class="mini-btn mini-btn--danger" type="button" data-act="delete">删除</button>
                 </div>
             </li>`
         })
@@ -506,7 +519,7 @@ function renderRuns(jobs) {
     $('#runs-count').textContent = `${jobs.length} 条`
 
     if (!jobs.length) {
-        list.innerHTML = '<li class="run-list__empty">还没有最近活动。完成一次账号授权后，结果会显示在这里。</li>'
+        list.innerHTML = '<li class="run-list__empty">暂无授权记录</li>'
         return
     }
 
@@ -619,7 +632,7 @@ async function handleSaveAccount(event) {
         applyAccounts(payload)
         resetForm()
         $('#account-editor').classList.remove('is-open')
-        toast('success', `账号已保存，可以点「连接」完成登录`)
+        toast('success', '账号已保存，点「登录账号」即可完成授权')
     } catch (error) {
         if (error.status === 401) return showUnlock('会话已过期，请重新输入访问密码')
         errorEl.textContent = error.message
@@ -633,9 +646,9 @@ async function handleSaveAccount(event) {
 /* ────────────────────────── 授权弹窗 ────────────────────────── */
 
 const PLATFORM_HINT = {
-    mobile: '仅启动手机端指纹浏览器登录 1 次，用于手机搜索、App 每日签到和阅读任务。',
-    desktop: '仅启动电脑端指纹浏览器登录 1 次，用于电脑搜索、每日任务和浏览活动。',
-    both: '微软 PC 与手机端会话及指纹相互独立：将先完成第 1 步（移动端登录），关闭后自动弹出第 2 步（桌面端登录）。'
+    mobile: '仅登录手机端（1 次），用于手机搜索与每日签到任务。',
+    desktop: '仅登录电脑端（1 次），用于电脑搜索与浏览活动。',
+    both: '依次完成手机端与电脑端登录（共 2 次），首窗关闭后自动弹出下一窗。'
 }
 
 function pickDefaultPlatform(account) {
@@ -875,9 +888,9 @@ function renderJob(job) {
     } else if (job.state === 'failed' || job.state === 'cancelled') {
         textEl.textContent =
             job.state === 'cancelled'
-                ? '已终止，未写入新会话'
+                ? '已终止'
                 : job.exitCode === 0
-                  ? '进程结束，但会话未写入（未判定为成功）'
+                  ? '未检测到新会话，请重试'
                   : `运行失败（退出码 ${job.exitCode ?? '—'}）`
         $('#job-time').textContent = timeOf(job.endedAt)
         $('#btn-stop-login').hidden = true
@@ -937,7 +950,7 @@ async function handleStopLogin() {
     if (!state.jobEmail) return
     try {
         await api('/api/login/stop', { method: 'POST', body: { email: state.jobEmail } })
-        toast('info', '已请求终止，任务将被标记为“已终止”')
+        toast('info', '已发送终止指令')
     } catch (error) {
         toast('error', error.message)
     }
@@ -975,7 +988,7 @@ function mergeJobIntoFeed(job) {
 function renderFeed() {
     const view = $('#log-view')
     const filtered = state.logFilter === 'all' ? state.feed : state.feed.filter(line => line.level === state.logFilter)
-    $('#logs-hint').textContent = `共 ${state.feed.length} 行 · 仅显示微软账号授权过程`
+    $('#logs-hint').textContent = `共 ${state.feed.length} 行`
 
     if (!filtered.length) {
         view.innerHTML = '<div class="log-empty">暂无日志。发起一次账号授权后，这里会实时滚动显示输出。</div>'
@@ -1003,9 +1016,31 @@ async function runAccount(index) {
 
 /* ────────────────────────── 主题 ────────────────────────── */
 
-function applyTheme(theme) {
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem(LS.theme, theme)
+function applyTheme(theme, persist = true) {
+    const resolved = theme === 'dark' ? 'dark' : 'light'
+    document.documentElement.dataset.theme = resolved
+    const label = $('#theme-label')
+    if (label) label.textContent = resolved === 'dark' ? '浅色外观' : '深色外观'
+    if (persist) {
+        try {
+            localStorage.setItem(LS.theme, resolved)
+            localStorage.setItem('rwd.theme', resolved)
+        } catch {}
+    }
+}
+
+function selectSettingsTab(name) {
+    const target = ['strategy', 'push', 'system'].includes(name) ? name : 'strategy'
+    for (const tab of $$('#settings-tabs .seg__item')) {
+        const active = tab.dataset.settingsTab === target
+        tab.classList.toggle('is-active', active)
+        tab.setAttribute('aria-selected', String(active))
+        tab.tabIndex = active ? 0 : -1
+    }
+    for (const pane of ['strategy', 'push', 'system']) {
+        const el = $(`#settings-pane-${pane}`)
+        if (el) el.hidden = pane !== target
+    }
 }
 
 /* ────────────────────────── 事件 ────────────────────────── */
@@ -1120,7 +1155,7 @@ function bindEvents() {
         state.accounts = null
         state.authenticated = false
         showUnlock()
-        toast('info', '已退出，连接信息已从本机浏览器清除')
+        toast('info', '已退出登录')
     })
 
     $('#btn-refresh').addEventListener('click', () => {
@@ -1150,7 +1185,7 @@ function bindEvents() {
             button.closest('details')?.removeAttribute('open')
             const ok = await confirmDialog({
                 title: `删除 ACCOUNT_${index}？`,
-                message: `将从 .env 移除 ${account.email} 的配置行（先备份为 .env.panel.bak）。已保存的会话不会删除。`,
+                message: `移除 ${account.email} 的配置（保留已保存的登录会话）。`,
                 confirmText: '删除',
                 danger: true
             })
@@ -1252,11 +1287,52 @@ function bindEvents() {
     })
     $('#platform-picker').addEventListener('change', syncPlatformPicker)
 
+    $('#settings-tabs')?.addEventListener('click', event => {
+        const tab = event.target.closest('.seg__item[data-settings-tab]')
+        if (!tab) return
+        selectSettingsTab(tab.dataset.settingsTab)
+    })
+    for (const tab of $$('#settings-tabs .seg__item[data-settings-tab]')) {
+        tab.id = `settings-tab-${tab.dataset.settingsTab}`
+        tab.setAttribute('aria-controls', `settings-pane-${tab.dataset.settingsTab}`)
+        tab.tabIndex = tab.classList.contains('is-active') ? 0 : -1
+        const pane = $(`#settings-pane-${tab.dataset.settingsTab}`)
+        if (pane) {
+            pane.setAttribute('role', 'tabpanel')
+            pane.setAttribute('aria-labelledby', tab.id)
+        }
+    }
+    $('#settings-tabs')?.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+        event.preventDefault()
+        const tabs = $$('#settings-tabs .seg__item[data-settings-tab]')
+        const i = tabs.indexOf(document.activeElement)
+        const next =
+            event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? tabs.length - 1
+                  : (i + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+        tabs[next].focus()
+        selectSettingsTab(tabs[next].dataset.settingsTab)
+    })
+
+    $('#dash-open-settings')?.addEventListener('click', () => {
+        selectSettingsTab('strategy')
+        $('#tabs [data-tab="settings"]').click()
+    })
+    for (const pill of [$('#pill-env'), $('#pill-api')]) {
+        pill?.addEventListener('click', () => {
+            selectSettingsTab('system')
+            $('#tabs [data-tab="settings"]').click()
+        })
+    }
+
     $('#log-filter').addEventListener('click', event => {
         const item = event.target.closest('.seg__item')
         if (!item) return
         state.logFilter = item.dataset.level
-        for (const other of $$('.seg__item')) other.classList.toggle('is-active', other === item)
+        for (const other of $$('#log-filter .seg__item')) other.classList.toggle('is-active', other === item)
         renderFeed()
     })
     $('#btn-clear-logs').addEventListener('click', () => {
@@ -1294,7 +1370,7 @@ async function bootAfterAuth() {
 }
 
 async function boot() {
-    applyTheme(localStorage.getItem(LS.theme) || 'light')
+    applyTheme(localStorage.getItem(LS.theme) || 'light', false)
     bindEvents()
 
     try {

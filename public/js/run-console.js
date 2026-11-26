@@ -30,20 +30,20 @@ export function runView(info, { pending = null, error = null } = {}) {
     let view = {
         active, stopDisabled: !active || pending === 'stop' || live === 'stopping',
         startDisabled: active || live !== 'idle' || Boolean(info?.authorization) || !info?.readiness?.ready,
-        badge: '待运行', title: '准备好，开始今天的签到', tone: 'idle',
-        description: `一键运行全部 ${info?.readiness?.accounts || 0} 个账号；任务和积分会自动记入运行记录。`,
+        badge: '待运行', title: '准备就绪', tone: 'idle',
+        description: `共 ${info?.readiness?.accounts || 0} 个账号，点击开始本轮签到。`,
         account: active ? info?.run?.currentAccount || latest?.run?.currentAccount || '等待账号信息' : latest?.run?.currentAccount || '全部账号',
-        task: active ? current?.label || (info?.run?.pendingDelay ? '等待下一步' : '初始化 / 等待任务信息') : '等待下一次运行',
+        task: active ? current?.label || (info?.run?.pendingDelay ? '等待下一步' : '初始化中') : '等待运行',
         duration: active ? elapsed(info?.startedAt || latest?.run?.startedAt) : latest ? elapsed(latest.run.startedAt, latest.run.endedAt || latest.run.updatedAt) : '—',
         points: (active ? sameRun ? latest?.run?.points : null : latest?.run?.points) ?? null,
-        hint: '第一次使用：添加账号 → 登录账号 → 一键运行签到。', action: null, actionLabel: '', email: null
+        hint: '添加账号 → 登录 → 运行签到', action: null, actionLabel: '', email: null
     }
     if (active) {
         const stopping = pending === 'stop' || live === 'stopping'
         view = { ...view, badge: stopping ? '正在停止' : live === 'running' && !pending ? '正在运行' : '正在启动',
-            title: stopping ? '正在结束本轮签到' : '签到正在进行', tone: 'running',
-            description: stopping ? '正在关闭脚本并保存记录，请稍等。停止通常需要几秒钟。' : info?.run?.pendingDelay ? '脚本正在按设定间隔等待，状态会自动更新。' : '脚本在服务器后台运行，关闭页面也会继续。',
-            hint: '可以随时停止；已完成的任务和已获得的积分会保留。' }
+            title: stopping ? '正在停止本轮签到' : '签到运行中', tone: 'running',
+            description: stopping ? '正在停止脚本并保存记录…' : info?.run?.pendingDelay ? '按设定间隔等待中，状态自动更新。' : '后台运行中，关闭页面不受影响。',
+            hint: '可随时停止，已完成任务会保留。' }
         if (!stopping) {
             const waiting = waitMessage(info?.run?.pendingDelay)
             const progress = sameRun ? info?.progress : null
@@ -70,15 +70,15 @@ export function runView(info, { pending = null, error = null } = {}) {
             actionLabel: { accounts: '添加账号', login: '去登录账号', settings: '检查环境' }[info.readiness?.action] || '检查环境',
             email: info.readiness?.loginRequired?.[0]?.email }
     } else if (newerExit) {
-        view = { ...view, badge: '需要检查', title: '上次启动未生成完整记录', tone: 'attention', points: null,
-            description: `脚本已退出${info.lastExit.code != null ? `（退出码 ${info.lastExit.code}）` : ''}，请查看运行记录或检查环境后重试。`,
-            hint: failure || '启动成功只代表进程已创建，任务结果以运行记录为准。', action: 'settings', actionLabel: '检查环境' }
+        view = { ...view, badge: '需要检查', title: '上次启动异常退出', tone: 'attention', points: null,
+            description: `脚本已退出${info.lastExit.code != null ? `（退出码 ${info.lastExit.code}）` : ''}，请检查日志或环境设置。`,
+            hint: failure || '可在任务记录或设置页排查退出原因。', action: 'settings', actionLabel: '检查环境' }
     } else if (latest) {
         const done = latest.run.state === 'completed'
         view = { ...view, badge: done ? '已完成' : latest.run.state === 'running' ? '正在保存记录' : '需要关注', title: LABELS[latest.run.state] || '正在确认上次运行结果', tone: done ? 'success' : 'attention',
             task: done ? '本轮任务已结束' : failed?.label || '查看本轮任务结果',
-            description: done ? '可以查看具体任务、积分和耗时，也可以手动再次运行。' : latest.run.state === 'cancelled' ? '本轮已停止，已完成的结果已经保存。需要时可以再次运行。' : '部分任务可能没有完成，请查看具体原因后再重试。',
-            hint: done ? '脚本会自行判断已完成的任务；可获得的积分以微软实际记录为准。' : failure ? `最近的问题：${failure}` : '打开运行记录，可以逐项查看成功、跳过和失败的任务。',
+            description: done ? '本轮积分与明细已记录。' : latest.run.state === 'cancelled' ? '已手动停止，已完成任务已保留。' : '部分任务未完成，可在记录页排查。',
+            hint: done ? '今日签到已完成。' : failure ? `问题：${failure}` : '打开任务记录可逐项查看执行结果。',
             action: loginError ? 'login' : 'logs', actionLabel: loginError ? '重新登录账号' : '查看本轮记录', email: accountError?.email || failed?.account }
     }
     if (error) view = { ...view, tone: 'attention', hint: error.message, action: error.action || 'refresh', actionLabel: { login: '去登录账号', accounts: '添加账号', settings: '检查环境' }[error.action] || '刷新状态', email: error.email || view.email }
@@ -104,7 +104,7 @@ export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
         $('#run-next-action').textContent = view.actionLabel
         $('#run-next-action').onclick = () => view.action === 'refresh' ? refresh(true) : onAction(view.action, view.email, info)
         const schedule = info?.schedule
-        $('#run-schedule').textContent = schedule?.enabled ? `定时签到：每天 ${schedule.runAt}（${schedule.timezone}）· 忙碌时跳过` : '定时签到未开启 · 当前需手动运行'
+        $('#run-schedule').textContent = schedule?.enabled ? `每日 ${schedule.runAt} 自动签到（${schedule.timezone}）` : '未开启定时'
         for (const button of document.querySelectorAll('#account-list [data-act="run"]')) button.disabled = view.active || Boolean(info?.authorization) || info?.state !== 'idle'
     }
     async function refresh(clearError = false) {

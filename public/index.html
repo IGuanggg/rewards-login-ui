@@ -6,12 +6,12 @@
         <meta name="color-scheme" content="light dark" />
         <title>Rewards 控制台</title>
         <script>
-            try { document.documentElement.dataset.theme = localStorage.getItem('rwd.theme') || 'light' } catch {}
+            try { document.documentElement.dataset.theme = localStorage.getItem('rwd.theme.v4') || 'light' } catch {}
         </script>
         <link rel="stylesheet" href="/css/styles.css" />
         <link
             rel="icon"
-            href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%232563eb'/%3E%3Cpath d='M9 20.5 14 11l4 7 5-9' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+            href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230071e3'/%3E%3Cpath d='M9 20.5 14 11l4 7 5-9' stroke='%23ffffff' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
         />
     </head>
     <body>
@@ -31,15 +31,15 @@
                             </svg>
                         </div>
 
-                        <p class="unlock__eyebrow">REWARDS CONSOLE</p>
-                        <h1 class="unlock__title">欢迎回来</h1>
-                        <p class="unlock__sub">本地微软 Rewards 账号授权与签到工作台</p>
+                        <p class="unlock__eyebrow">Rewards</p>
+                        <h1 class="unlock__title">输入密码进入</h1>
+                        <p class="unlock__sub">Microsoft Rewards 控制台</p>
 
                         <form id="unlock-form" class="unlock__form" novalidate>
                             <label class="field">
-                                <span class="field__label">面板访问密码</span>
+                                <span class="field__label">访问密码</span>
                                 <span class="field__control field__control--mono">
-                                    <input id="unlock-token" type="password" spellcheck="false" autocomplete="current-password" placeholder="输入面板访问密码" />
+                                    <input id="unlock-token" type="password" spellcheck="false" autocomplete="current-password" placeholder="输入面板密码" />
                                     <button class="ghost-btn" type="button" id="btn-reveal-token">显示</button>
                                 </span>
                             </label>
@@ -47,24 +47,14 @@
                             <p class="form-error" id="unlock-error" role="alert" hidden></p>
 
                             <button class="liquid-btn liquid-btn--solid liquid-btn--full" type="submit" id="btn-unlock">
-                                <span class="liquid-btn__icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10.5" width="14" height="9" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 10.5V8a3.5 3.5 0 1 1 7 0v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                                </span>
                                 <span class="liquid-btn__text">进入控制台</span>
                             </button>
                         </form>
 
                         <details class="unlock__help">
-                            <summary>找不到访问密码？</summary>
-                            <p class="unlock__hint" id="unlock-hint">密码见终端启动输出或面板目录 <code>config.json</code></p>
+                            <summary>忘了密码？</summary>
+                            <p class="unlock__hint" id="unlock-hint">查看启动日志或 <code>config.json</code></p>
                         </details>
-
-                        <p class="unlock__terms">
-                            继续即表示同意
-                            <button type="button" class="link-btn" data-dialog="dlg-terms">服务条款</button>
-                            与
-                            <button type="button" class="link-btn" data-dialog="dlg-privacy">隐私说明</button>
-                        </p>
                     </div>
                 </div>
             </section>
@@ -78,15 +68,14 @@
                                 <svg viewBox="0 0 32 32" fill="none"><path d="M8.5 21.5 14 10.5l4.2 7.4L23.5 9" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </span>
                             <div>
-                                <h1>连接本机服务</h1>
-                                <p class="muted">指定上游 Microsoft-Rewards-Script 仓库根目录并完成环境自检</p>
+                                <h1>连接脚本目录</h1>
+                                <p class="muted">定位 Microsoft-Rewards-Script 根目录并完成环境检查</p>
                             </div>
                         </header>
 
                         <label class="field">
-                            <span class="field__label">脚本安装目录</span>
+                            <span class="field__label">仓库根目录</span>
                             <span class="field__control field__control--mono">
-                                <svg class="field__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h3l1.6 2h6.4A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
                                 <input id="setup-path" type="text" spellcheck="false" placeholder="例如 D:\Microsoft-Rewards-Script" />
                                 <button class="ghost-btn" type="button" id="btn-setup-detect">自动探测</button>
                             </span>
@@ -102,16 +91,16 @@
                 </div>
             </section>
 
-            <!-- ══ 3. 主控制台（桌面端侧栏 + 主画布 / 移动端顶栏 + 底部导航） ══ -->
+            <!-- ══ 3. 主控制台（左侧紧凑侧边栏 + 右侧 Fintech Bento 工作区） ══ -->
             <section class="view view--app" id="view-app" hidden>
-                <aside class="topbar" aria-label="控制台导航与状态">
-                    <div class="topbar__left">
+                <aside class="sidebar" aria-label="主侧边栏">
+                    <div class="sidebar__brand">
                         <span class="brand__mark" aria-hidden="true">
                             <svg viewBox="0 0 32 32" fill="none"><path d="M8.5 21.5 14 10.5l4.2 7.4L23.5 9" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </span>
-                        <div class="topbar__title">
-                            <strong>Rewards 控制台</strong>
-                            <span id="topbar-path" class="mono-dim">—</span>
+                        <div class="sidebar__title">
+                            <strong>Rewards</strong>
+                            <span id="topbar-path" class="mono-dim">中国大陆</span>
                         </div>
                     </div>
 
@@ -126,7 +115,7 @@
                         </button>
                         <button class="tab" role="tab" data-tab="logs" aria-selected="false">
                             <svg class="tab__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 6.5h14M5 12h14M5 17.5h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                            <span>任务记录</span>
+                            <span>记录</span>
                         </button>
                         <button class="tab" role="tab" data-tab="settings" aria-selected="false">
                             <svg class="tab__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -134,132 +123,143 @@
                         </button>
                     </nav>
 
-                    <div class="topbar__right">
-                        <div class="status-tray">
-                            <span class="pill pill--dot" id="pill-env"><i></i><span>环境</span></span>
-                            <span class="pill pill--dot" id="pill-api"><i></i><span>签到接口</span></span>
+                    <div class="sidebar__footer">
+                        <div class="sidebar__status" aria-label="系统连接状态">
+                            <button class="status-row pill--dot" id="pill-env" type="button" title="点击检查脚本实例配置">
+                                <i></i>
+                                <span>环境</span>
+                            </button>
+                            <button class="status-row pill--dot" id="pill-api" type="button" title="点击检查签到接口配置">
+                                <i></i>
+                                <span>签到接口</span>
+                            </button>
                         </div>
-                        <div class="topbar__actions">
-                            <button class="icon-btn" id="btn-theme" type="button" title="切换浅色/深色主题" aria-label="切换主题">
+
+                        <div class="sidebar__actions">
+                            <button class="sidebar-btn" id="btn-theme" type="button" title="切换浅色/深色主题" aria-label="切换主题">
                                 <svg class="icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4m0-12.8L17 7M7 17l-1.4 1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="3.6" stroke="currentColor" stroke-width="1.8"/></svg>
                                 <svg class="icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 7.5 7.5 0 1 0 20 14.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                                <span class="sidebar-btn__label" id="theme-label">深色外观</span>
                             </button>
-                            <button class="ghost-btn ghost-btn--bordered" id="btn-logout" type="button">退出</button>
+                            <button class="sidebar-btn sidebar-btn--muted" id="btn-logout" type="button" title="退出控制台">
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H4m10-7h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                <span class="sidebar-btn__label">退出</span>
+                            </button>
                         </div>
                     </div>
                 </aside>
 
                 <div class="app-stage">
                     <div class="app-content">
-                        <!-- ── 面板 1：总览 ── -->
+                        <!-- ══ 面板 1：总览（Fintech Bento 工作台） ══ -->
                         <div id="panel-dashboard" class="dashboard">
                             <header class="page-head">
                                 <div>
-                                    <h1>仪表盘</h1>
-                                    <p class="page-head__meta" id="dash-updated">正在读取运行记录…</p>
+                                    <h1>总览</h1>
+                                    <p class="page-head__meta" id="dash-updated">正在同步数据…</p>
                                 </div>
                                 <div class="page-head__actions">
-                                    <span class="region-chip">中国大陆 · CN</span>
                                     <button class="ghost-btn ghost-btn--bordered" id="dash-refresh" type="button">
                                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                        刷新
+                                        刷新数据
                                     </button>
                                 </div>
                             </header>
 
                             <p id="dash-error" class="form-error" role="status" hidden></p>
 
-                            <div class="stat-grid">
-                                <article class="stat-card" data-color="neutral">
-                                    <div class="stat-card__top">
-                                        <span class="stat-card__label">账号总数</span>
-                                        <span class="stat-card__dot" aria-hidden="true"></span>
-                                    </div>
-                                    <strong id="dash-accounts">—</strong>
-                                    <p>当前实例管理的账号</p>
-                                </article>
-                                <article class="stat-card" data-color="green">
-                                    <div class="stat-card__top">
-                                        <span class="stat-card__label">已存会话</span>
-                                        <span class="stat-card__dot" aria-hidden="true"></span>
-                                    </div>
-                                    <strong id="dash-sessions">—</strong>
-                                    <p id="dash-session-note">会话已落盘保存</p>
-                                </article>
-                                <article class="stat-card" data-color="blue">
-                                    <div class="stat-card__top">
-                                        <span class="stat-card__label">今日确认积分</span>
-                                        <span class="stat-card__dot" aria-hidden="true"></span>
-                                    </div>
-                                    <strong id="dash-points">—</strong>
-                                    <p>按启动日期汇总</p>
-                                </article>
-                                <article class="stat-card" data-color="orange">
-                                    <div class="stat-card__top">
-                                        <span class="stat-card__label">最近确认余额</span>
-                                        <span class="stat-card__dot" aria-hidden="true"></span>
-                                    </div>
-                                    <strong id="dash-balance">—</strong>
-                                    <p id="dash-balance-note">尚无余额数据</p>
-                                </article>
-                                <article class="stat-card" data-color="neutral">
-                                    <div class="stat-card__top">
-                                        <span class="stat-card__label">待关注任务</span>
-                                        <span class="stat-card__dot" aria-hidden="true"></span>
-                                    </div>
-                                    <strong id="dash-attention">—</strong>
-                                    <p>失败或未完成项</p>
-                                </article>
-                            </div>
-
-                            <section class="run-console" id="run-console" aria-labelledby="run-title" data-tone="idle">
-                                <div class="run-console__grid">
-                                    <div class="run-console__main">
-                                        <div class="run-console__eyebrow">
-                                            <span>签到工作台</span>
-                                            <span class="run-badge" id="run-badge" role="status">正在读取状态</span>
+                            <!-- Bento 首行：左侧高端渐变积分卡 + 右侧签到控制台 -->
+                            <div class="bento-hero">
+                                <section class="wealth-card" aria-label="积分资产总览">
+                                    <div class="wealth-card__head">
+                                        <div class="wealth-card__brand">
+                                            <span class="wealth-card__chip" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.4L20.5 9.2l-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9-4.3-4.1 5.9-.8L12 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                                            </span>
+                                            <span>Microsoft Rewards</span>
                                         </div>
-                                        <h2 id="run-title">准备好，开始今天的签到</h2>
-                                        <p class="run-console__desc" id="run-description">正在连接签到服务，读取账号和运行状态…</p>
+                                        <div class="wealth-card__delta">
+                                            <span class="wealth-card__delta-dot" aria-hidden="true"></span>
+                                            <span>今日</span>
+                                            <strong id="dash-points">—</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="wealth-card__main">
+                                        <span class="wealth-card__label">总积分余额</span>
+                                        <div class="wealth-card__figure">
+                                            <strong class="wealth-card__balance" id="dash-balance">—</strong>
+                                            <span class="wealth-card__unit">PTS</span>
+                                        </div>
+                                        <p class="wealth-card__sub" id="dash-balance-note">等待首次上报</p>
+                                    </div>
+
+                                    <div class="wealth-card__dock">
+                                        <article class="stat-card wealth-stat" data-color="neutral">
+                                            <span class="wealth-stat__label">账号总数</span>
+                                            <strong id="dash-accounts">—</strong>
+                                        </article>
+                                        <article class="stat-card wealth-stat" data-color="green">
+                                            <span class="wealth-stat__label">已登录</span>
+                                            <strong id="dash-sessions">—</strong>
+                                            <span class="wealth-stat__hint" id="dash-session-note"></span>
+                                        </article>
+                                        <article class="stat-card wealth-stat" data-color="neutral">
+                                            <span class="wealth-stat__label">待处理</span>
+                                            <strong id="dash-attention">—</strong>
+                                        </article>
+                                    </div>
+                                </section>
+
+                                <section class="run-console" id="run-console" aria-labelledby="run-title" data-tone="idle">
+                                    <div class="run-console__top">
+                                        <div class="run-console__eyebrow">
+                                            <span class="run-badge" id="run-badge" role="status">正在连接</span>
+                                            <span class="run-console__schedule" id="run-schedule">—</span>
+                                        </div>
+                                        <h2 id="run-title">准备就绪</h2>
+                                        <p class="run-console__desc" id="run-description">正在同步签到状态…</p>
                                         <div class="run-console__actions">
                                             <button class="liquid-btn liquid-btn--solid" id="btn-run-all" type="button" disabled>
-                                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
                                                 <span class="liquid-btn__text">一键运行签到</span>
                                             </button>
                                             <button class="ghost-btn ghost-btn--danger run-console__stop" id="btn-stop-run" type="button" hidden>停止运行</button>
-                                            <button class="ghost-btn ghost-btn--bordered" id="btn-run-records" type="button">查看任务记录 <span aria-hidden="true">→</span></button>
+                                            <button class="ghost-btn ghost-btn--bordered" id="btn-run-records" type="button">任务记录 <span aria-hidden="true">→</span></button>
                                         </div>
-                                        <p class="run-console__schedule" id="run-schedule">正在读取定时设置…</p>
                                     </div>
 
                                     <dl class="run-console__metrics">
-                                        <div><dt>当前 / 最近账号</dt><dd id="run-current-account">—</dd></div>
-                                        <div><dt>当前任务 / 结果</dt><dd id="run-current-task">—</dd></div>
-                                        <div><dt>本轮耗时</dt><dd id="run-elapsed">—</dd></div>
-                                        <div><dt>本轮确认积分</dt><dd id="run-earned" class="is-highlight">待确认</dd></div>
+                                        <div><dt>当前账号</dt><dd id="run-current-account">—</dd></div>
+                                        <div><dt>当前任务</dt><dd id="run-current-task">—</dd></div>
+                                        <div><dt>耗时</dt><dd id="run-elapsed">—</dd></div>
+                                        <div><dt>本轮得分</dt><dd id="run-earned" class="is-highlight">—</dd></div>
                                     </dl>
-                                </div>
-                                <div class="run-console__guidance">
-                                    <p id="run-guidance">添加账号 → 登录账号 → 一键运行签到。</p>
-                                    <button class="ghost-btn ghost-btn--bordered" id="run-next-action" type="button" hidden></button>
-                                </div>
-                            </section>
 
+                                    <div class="run-console__guidance">
+                                        <p id="run-guidance">添加账号 → 完成登录 → 一键签到。</p>
+                                        <button class="ghost-btn ghost-btn--bordered" id="run-next-action" type="button" hidden></button>
+                                    </div>
+                                </section>
+                            </div>
+
+                            <!-- Bento 次行：14 天平滑曲线走势 + 运行策略摘要 -->
                             <div class="dashboard-grid">
                                 <section class="card dashboard-card">
                                     <div class="card__head">
                                         <div>
-                                            <h2>近 14 天积分趋势</h2>
+                                            <h2>近 14 天积分走势</h2>
+                                            <p class="muted">每日确认收益曲线</p>
                                         </div>
-                                        <span class="muted">确认积分 / 分</span>
+                                        <span class="meta-chip meta-chip--accent">14D</span>
                                     </div>
                                     <div class="card__body">
                                         <div id="dash-trend" class="dashboard-chart"><p class="muted">读取中…</p></div>
                                         <details class="chart-data">
-                                            <summary>查看每日明细</summary>
+                                            <summary>展开每日数据表</summary>
                                             <div class="activity-table-wrap">
                                                 <table class="activity-table">
-                                                    <thead><tr><th>日期</th><th class="num">确认积分</th><th class="num">运行次数</th></tr></thead>
+                                                    <thead><tr><th>日期</th><th class="num">得分</th><th class="num">轮次</th></tr></thead>
                                                     <tbody id="dash-trend-table"></tbody>
                                                 </table>
                                             </div>
@@ -269,35 +269,42 @@
 
                                 <section class="card dashboard-card">
                                     <div class="card__head">
-                                        <div><h2>运行环境</h2></div>
-                                        <span class="region-chip">CN</span>
+                                        <div>
+                                            <h2>运行配置</h2>
+                                            <p class="muted">当前签到策略与内核状态</p>
+                                        </div>
+                                        <button class="ghost-btn ghost-btn--link" id="dash-open-settings" type="button">调整 →</button>
                                     </div>
                                     <div class="card__body">
                                         <dl class="environment-list">
-                                            <div><dt>搜索词来源</dt><dd id="dash-source">—</dd></div>
-                                            <div><dt>下一次定时</dt><dd id="dash-next">—</dd></div>
-                                            <div><dt>最近定时结果</dt><dd id="dash-schedule-last">—</dd></div>
-                                            <div><dt>当前版本</dt><dd id="dash-version" class="mono">—</dd></div>
-                                            <div><dt>运行策略</dt><dd>账号依次执行 · 按需启动浏览器</dd></div>
+                                            <div><dt>执行模式</dt><dd id="dash-mode">—</dd></div>
+                                            <div><dt>防断签保护</dt><dd id="dash-streak">—</dd></div>
+                                            <div><dt>搜索词源</dt><dd id="dash-source">—</dd></div>
+                                            <div><dt>下次定时</dt><dd id="dash-next">—</dd></div>
+                                            <div><dt>定时记录</dt><dd id="dash-schedule-last">—</dd></div>
+                                            <div><dt>内核版本</dt><dd id="dash-version" class="mono">—</dd></div>
                                         </dl>
                                     </div>
                                 </section>
                             </div>
 
+                            <!-- Bento 末行：账号明细账本 -->
                             <section class="card dashboard-card">
                                 <div class="card__head">
-                                    <div><h2>账号积分明细</h2></div>
-                                    <span class="muted">余额取最近一次上报，非实时查询</span>
+                                    <div>
+                                        <h2>账号积分明细</h2>
+                                        <p class="muted">各账号会话与今日入账</p>
+                                    </div>
                                 </div>
                                 <div class="activity-table-wrap" tabindex="0" aria-label="账号积分明细，可横向滚动">
                                     <table class="activity-table">
                                         <thead>
                                             <tr>
-                                                <th>微软账号</th>
-                                                <th>会话状态</th>
-                                                <th class="num">今日确认积分</th>
-                                                <th class="num">最近余额</th>
-                                                <th>余额上报时间</th>
+                                                <th>账号</th>
+                                                <th>会话</th>
+                                                <th class="num">今日得分</th>
+                                                <th class="num">当前余额</th>
+                                                <th>更新时间</th>
                                             </tr>
                                         </thead>
                                         <tbody id="dash-account-body"></tbody>
@@ -306,12 +313,12 @@
                             </section>
                         </div>
 
-                        <!-- ── 面板 2：账号与授权 ── -->
+                        <!-- ══ 面板 2：账号（卡片网格） ══ -->
                         <div class="panel-stack" id="panel-accounts" hidden>
                             <header class="page-head">
                                 <div>
-                                    <h1>账号与授权</h1>
-                                    <p class="page-head__meta">管理微软账号与手机端 / 电脑端独立会话状态</p>
+                                    <h1>账号</h1>
+                                    <p class="page-head__meta" id="accounts-hint">读取中…</p>
                                 </div>
                                 <div class="page-head__actions">
                                     <button class="ghost-btn ghost-btn--bordered" id="btn-refresh" type="button">
@@ -324,27 +331,20 @@
                                 </div>
                             </header>
 
-                            <section class="card">
-                                <div class="card__head">
-                                    <div>
-                                        <h2>我的账号</h2>
-                                        <p class="muted" id="accounts-hint">读取中…</p>
-                                    </div>
-                                </div>
-                                <ul class="account-list" id="account-list"></ul>
-                                <div class="empty-state" id="accounts-empty" hidden>
-                                    <span class="empty-state__icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M5 19.5c.8-3.4 3.4-5.2 7-5.2s6.2 1.8 7 5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                                    </span>
-                                    <p class="empty-state__title">还没有微软账号</p>
-                                    <p class="muted">添加账号后完成登录授权，会话会自动落盘复用</p>
-                                    <button class="liquid-btn liquid-btn--solid" type="button" id="btn-empty-add"><span class="liquid-btn__text">添加第一个账号</span></button>
-                                </div>
+                            <ul class="account-grid" id="account-list"></ul>
+
+                            <section class="card empty-state" id="accounts-empty" hidden>
+                                <span class="empty-state__icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M5 19.5c.8-3.4 3.4-5.2 7-5.2s6.2 1.8 7 5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                                </span>
+                                <p class="empty-state__title">还没有微软账号</p>
+                                <p class="muted">添加账号并完成登录，之后签到自动复用会话</p>
+                                <button class="liquid-btn liquid-btn--solid" type="button" id="btn-empty-add"><span class="liquid-btn__text">添加第一个账号</span></button>
                             </section>
 
                             <section class="card">
                                 <div class="card__head">
-                                    <div><h2>最近授权活动</h2></div>
+                                    <div><h2>最近授权记录</h2></div>
                                     <span class="tag tag--muted" id="runs-count">0 条</span>
                                 </div>
                                 <ul class="run-list" id="run-list"></ul>
@@ -367,7 +367,6 @@
                                         <label class="field">
                                             <span class="field__label">微软账号邮箱</span>
                                             <span class="field__control">
-                                                <svg class="field__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
                                                 <input id="f-email" name="email" type="email" spellcheck="false" placeholder="someone@outlook.com" required />
                                             </span>
                                         </label>
@@ -388,13 +387,12 @@
                                         </div>
 
                                         <details class="advanced">
-                                            <summary>登录凭据与高级设置<span class="chev" aria-hidden="true"></span></summary>
+                                            <summary>密码、双重验证与代理设置<span class="chev" aria-hidden="true"></span></summary>
                                             <div class="advanced__body">
-                                                <p class="advanced__note">填写密码与 TOTP 后脚本可自动登录；只使用手动浏览器授权时可留空。</p>
+                                                <p class="advanced__note">填写密码与 TOTP 后可自动登录；手动浏览器登录可留空。</p>
                                                 <label class="field">
                                                     <span class="field__label">微软账号密码 <i>可选</i></span>
                                                     <span class="field__control">
-                                                        <svg class="field__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10.5V8a3.5 3.5 0 1 1 7 0v2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
                                                         <input id="f-password" name="password" type="password" spellcheck="false" placeholder="输入微软账号密码" />
                                                         <button class="ghost-btn" type="button" data-reveal="f-password">显示</button>
                                                     </span>
@@ -402,12 +400,11 @@
                                                 <label class="field">
                                                     <span class="field__label">TOTP 密钥 <i>可选</i></span>
                                                     <span class="field__control field__control--mono">
-                                                        <svg class="field__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.8V12l2.8 1.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-                                                        <input id="f-totp" name="totpSecret" type="text" spellcheck="false" placeholder="开启验证器登录时填写" />
+                                                        <input id="f-totp" name="totpSecret" type="text" spellcheck="false" placeholder="验证器密钥" />
                                                     </span>
                                                 </label>
                                                 <label class="field">
-                                                    <span class="field__label">备用邮箱 <i>恢复验证用</i></span>
+                                                    <span class="field__label">备用邮箱 <i>可选</i></span>
                                                     <span class="field__control"><input id="f-recovery" name="recoveryEmail" type="email" spellcheck="false" placeholder="recovery@example.com" /></span>
                                                 </label>
                                                 <div class="field-row">
@@ -431,14 +428,8 @@
                                                     </label>
                                                 </div>
                                                 <div class="field-row">
-                                                    <label class="check-row">
-                                                        <input type="checkbox" id="f-fp-mobile" checked />
-                                                        <span>保存移动端指纹</span>
-                                                    </label>
-                                                    <label class="check-row">
-                                                        <input type="checkbox" id="f-fp-desktop" checked />
-                                                        <span>保存桌面端指纹</span>
-                                                    </label>
+                                                    <label class="check-row"><input type="checkbox" id="f-fp-mobile" checked /><span>保存手机端指纹</span></label>
+                                                    <label class="check-row"><input type="checkbox" id="f-fp-desktop" checked /><span>保存电脑端指纹</span></label>
                                                 </div>
                                             </div>
                                         </details>
@@ -456,12 +447,12 @@
                             </div>
                         </div>
 
-                        <!-- ── 面板 3：任务记录与日志 ── -->
+                        <!-- ══ 面板 3：记录与日志 ══ -->
                         <div class="panel-stack" id="panel-logs" hidden>
                             <header class="page-head">
                                 <div>
                                     <h1 id="activity-title">任务记录</h1>
-                                    <p class="page-head__meta">按日期查看每轮签到的执行明细、确认积分与原始日志</p>
+                                    <p class="page-head__meta" id="activity-note" role="status">读取中…</p>
                                 </div>
                                 <div class="page-head__actions activity-controls">
                                     <label class="date-field">
@@ -475,22 +466,21 @@
 
                             <section class="card activity-card" aria-labelledby="activity-title">
                                 <div class="activity-stats" aria-label="当日签到汇总">
-                                    <div><span>签到轮次</span><strong id="activity-runs">—</strong></div>
-                                    <div><span>任务明细</span><strong id="activity-tasks">—</strong></div>
-                                    <div><span>已获积分</span><strong id="activity-points">—</strong></div>
-                                    <div><span>需要关注</span><strong id="activity-attention">—</strong></div>
+                                    <div><span>轮次</span><strong id="activity-runs">—</strong></div>
+                                    <div><span>任务</span><strong id="activity-tasks">—</strong></div>
+                                    <div><span>得分</span><strong id="activity-points" class="is-gain">—</strong></div>
+                                    <div><span>待处理</span><strong id="activity-attention">—</strong></div>
                                 </div>
-                                <p class="activity-note" id="activity-note" role="status"></p>
 
                                 <div class="activity-empty" id="activity-empty" hidden>
-                                    <strong>这一天还没有签到记录</strong>
-                                    <p>从「总览」或「账号」页运行签到后，这里会自动展示执行明细。</p>
+                                    <strong>当日暂无签到记录</strong>
+                                    <p>在「总览」或「账号」页启动签到后会自动记录。</p>
                                 </div>
 
                                 <div class="activity-detail" id="activity-detail" hidden>
                                     <div class="activity-run-picker">
                                         <label>
-                                            <span>选择一轮签到</span>
+                                            <span>轮次</span>
                                             <select id="activity-run-select"></select>
                                         </label>
                                         <span class="tag" id="activity-run-state"></span>
@@ -499,14 +489,14 @@
                                     <p class="activity-note" id="activity-accounts"></p>
                                     <div class="activity-table-wrap" tabindex="0" aria-label="签到任务明细，可横向滚动">
                                         <table class="activity-table">
-                                            <thead><tr><th>开始时间</th><th>账号</th><th>任务</th><th>平台</th><th>结果</th><th class="num">积分</th></tr></thead>
+                                            <thead><tr><th>时间</th><th>账号</th><th>任务</th><th>平台</th><th>状态</th><th class="num">得分</th></tr></thead>
                                             <tbody id="activity-task-list"></tbody>
                                         </table>
                                     </div>
                                     <details class="activity-raw" id="activity-raw">
-                                        <summary>查看这轮签到的原始日志</summary>
+                                        <summary>原始运行日志</summary>
                                         <div class="activity-log-toolbar">
-                                            <label>日志级别
+                                            <label>级别
                                                 <select id="activity-log-level">
                                                     <option value="all">全部</option>
                                                     <option value="warn">警告</option>
@@ -514,22 +504,25 @@
                                                     <option value="info">信息</option>
                                                 </select>
                                             </label>
-                                            <button class="ghost-btn ghost-btn--bordered" id="activity-log-older" type="button" hidden>更早日志</button>
-                                            <button class="ghost-btn ghost-btn--bordered" id="activity-log-latest" type="button" hidden>回到最新</button>
-                                            <span class="muted">默认显示最近 200 行</span>
+                                            <button class="ghost-btn ghost-btn--bordered" id="activity-log-older" type="button" hidden>更早</button>
+                                            <button class="ghost-btn ghost-btn--bordered" id="activity-log-latest" type="button" hidden>最新</button>
+                                            <span class="muted">每页 200 行</span>
                                         </div>
                                         <div class="log-view" id="activity-log-output" role="log"></div>
                                     </details>
                                 </div>
                             </section>
 
-                            <section class="card card--logs">
-                                <div class="card__head">
+                            <details class="card card--logs-collapse">
+                                <summary class="card__head">
                                     <div>
                                         <h2>账号授权实时日志</h2>
                                         <p class="muted" id="logs-hint">等待连接…</p>
                                     </div>
-                                    <div class="card__head-actions">
+                                    <span class="chev" aria-hidden="true"></span>
+                                </summary>
+                                <div class="card__body logs-collapse__body">
+                                    <div class="logs-toolbar">
                                         <div class="seg" id="log-filter">
                                             <button class="seg__item is-active" type="button" data-level="all">全部</button>
                                             <button class="seg__item" type="button" data-level="info">信息</button>
@@ -539,67 +532,84 @@
                                         <label class="switch">
                                             <input type="checkbox" id="log-autoscroll" checked />
                                             <span class="switch__track"><span class="switch__thumb"></span></span>
-                                            <span class="switch__label">跟随</span>
+                                            <span class="switch__label">跟随滚动</span>
                                         </label>
                                         <button class="ghost-btn ghost-btn--bordered" id="btn-clear-logs" type="button">清空</button>
                                     </div>
-                                </div>
-                                <div class="card__body">
                                     <div class="log-view" id="log-view" role="log" aria-live="polite"></div>
                                 </div>
-                            </section>
+                            </details>
                         </div>
 
-                        <!-- ── 面板 4：设置 ── -->
+                        <!-- ══ 面板 4：设置（子页签分组） ══ -->
                         <div class="panel-stack" id="panel-settings" hidden>
                             <header class="page-head">
                                 <div>
                                     <h1>设置</h1>
-                                    <p class="page-head__meta">配置签到任务、间隔策略、每日定时、结果通知与系统环境</p>
+                                </div>
+                                <div class="seg seg--lg" id="settings-tabs" role="tablist" aria-label="设置分类">
+                                    <button class="seg__item is-active" type="button" role="tab" data-settings-tab="strategy" aria-selected="true">签到策略</button>
+                                    <button class="seg__item" type="button" role="tab" data-settings-tab="push" aria-selected="false">消息推送</button>
+                                    <button class="seg__item" type="button" role="tab" data-settings-tab="system" aria-selected="false">系统与环境</button>
                                 </div>
                             </header>
 
-                            <section class="card">
+                            <!-- 子页签 1：签到策略 -->
+                            <section class="card" id="settings-pane-strategy">
                                 <div class="card__head">
                                     <div>
                                         <h2>签到任务与运行策略</h2>
-                                        <p class="muted">勾选任务会自动保存，间隔与定时修改后点击下方保存生效</p>
+                                        <p class="muted">任务勾选即保存，其余修改点击保存生效</p>
                                     </div>
-                                    <button class="ghost-btn ghost-btn--bordered" type="button" id="task-settings-reload">重新读取</button>
+                                    <div class="card__head-actions">
+                                        <button class="ghost-btn ghost-btn--accent" id="task-china-preset" type="button">套用国区建议</button>
+                                        <button class="ghost-btn ghost-btn--bordered" type="button" id="task-settings-reload">重新读取</button>
+                                    </div>
                                 </div>
                                 <form id="task-settings-form" class="task-settings-form">
                                     <fieldset id="task-settings-fields" disabled>
-                                        <legend>启用哪些任务</legend>
+                                        <legend>启用任务</legend>
                                         <div class="task-options" id="task-options"></div>
 
                                         <div class="task-settings-columns">
                                             <fieldset class="sub-card">
                                                 <div class="sub-card__head">
-                                                    <legend>国区运行与间隔</legend>
-                                                    <button class="ghost-btn ghost-btn--accent" id="task-china-preset" type="button">填入国区建议值</button>
+                                                    <legend>运行模式与节奏</legend>
+                                                </div>
+                                                <div class="field-row">
+                                                    <label class="field">
+                                                        <span class="field__label">执行模式 <i>v5.0+</i></span>
+                                                        <select id="task-rewards-mode">
+                                                            <option value="api">纯接口模式（省内存，推荐）</option>
+                                                            <option value="browser">浏览器模式（完整渲染）</option>
+                                                        </select>
+                                                    </label>
+                                                    <label class="field">
+                                                        <span class="field__label">搜索词来源</span>
+                                                        <select id="task-query-mode">
+                                                            <option value="china">国内热词 + 中文兜底</option>
+                                                            <option value="china-local">中文本地词库</option>
+                                                            <option value="existing">保留当前来源</option>
+                                                            <option value="local">上游本地词库</option>
+                                                            <option value="default">恢复上游默认</option>
+                                                        </select>
+                                                    </label>
                                                 </div>
                                                 <div class="delay-grid">
-                                                    <label class="field"><span class="field__label">搜索最小间隔 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-searchDelay-min" min="30" max="3600" required /></span></label>
-                                                    <label class="field"><span class="field__label">搜索最大间隔 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-searchDelay-max" min="30" max="3600" required /></span></label>
-                                                    <label class="field"><span class="field__label">阅读最小间隔 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-readDelay-min" min="30" max="3600" required /></span></label>
-                                                    <label class="field"><span class="field__label">阅读最大间隔 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-readDelay-max" min="30" max="3600" required /></span></label>
+                                                    <label class="field"><span class="field__label">搜索间隔最小 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-searchDelay-min" min="30" max="3600" required /></span></label>
+                                                    <label class="field"><span class="field__label">搜索间隔最大 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-searchDelay-max" min="30" max="3600" required /></span></label>
+                                                    <label class="field"><span class="field__label">阅读间隔最小 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-readDelay-min" min="30" max="3600" required /></span></label>
+                                                    <label class="field"><span class="field__label">阅读间隔最大 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-readDelay-max" min="30" max="3600" required /></span></label>
+                                                    <label class="field"><span class="field__label">活动间隔最小 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-taskDelay-min" min="0" max="3600" required /></span></label>
+                                                    <label class="field"><span class="field__label">活动间隔最大 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-taskDelay-max" min="0" max="3600" required /></span></label>
                                                     <label class="field"><span class="field__label">切换账号最小 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-accountDelay-min" min="0" max="3600" required /></span></label>
                                                     <label class="field"><span class="field__label">切换账号最大 (秒)</span><span class="field__control field__control--mono"><input type="number" id="task-accountDelay-max" min="0" max="3600" required /></span></label>
                                                 </div>
-                                                <label class="field">
-                                                    <span class="field__label">搜索词来源</span>
-                                                    <select id="task-query-mode">
-                                                        <option value="china">国内热词 + 中文本地兜底（推荐）</option>
-                                                        <option value="china-local">中文本地词库（无需热词接口）</option>
-                                                        <option value="existing">保留当前来源</option>
-                                                        <option value="local">仅本地词库</option>
-                                                        <option value="default">恢复上游默认来源</option>
-                                                    </select>
-                                                </label>
                                                 <p class="settings-note"><span id="task-china-support"></span></p>
                                                 <div class="check-stack">
+                                                    <label class="check-row"><input type="checkbox" id="task-streak-protection" /><span>自动开启连续签到保护（防断签）</span></label>
                                                     <label class="check-row"><input type="checkbox" id="task-stop-warning" /><span>触发风控警告时立即停止</span></label>
-                                                    <label class="check-row"><input type="checkbox" id="task-skip-empty" /><span>跳过没有积分的任务</span></label>
+                                                    <label class="check-row"><input type="checkbox" id="task-skip-empty" /><span>跳过无积分任务</span></label>
                                                 </div>
                                             </fieldset>
 
@@ -613,10 +623,10 @@
                                                     <span class="field__control field__control--mono"><input type="time" id="task-schedule-time" required /></span>
                                                 </label>
                                                 <p class="settings-note" id="task-schedule-zone"></p>
-                                                <p class="settings-note" id="task-schedule-unsupported" hidden>仅 Docker 部署模式支持面板内置定时</p>
+                                                <p class="settings-note" id="task-schedule-unsupported" hidden>仅 Docker 部署模式支持面板定时</p>
                                                 <div class="task-settings-tip">
-                                                    <strong>低内存保护模式</strong>
-                                                    <p>账号按顺序依次执行，搜索不并发，避免小内存主机 OOM。</p>
+                                                    <strong>纯接口模式</strong>
+                                                    <p>登录后自动关闭浏览器，任务与搜索直接走 HTTP，低内存机器运行更稳。</p>
                                                 </div>
                                             </fieldset>
                                         </div>
@@ -629,62 +639,82 @@
                                 </form>
                             </section>
 
-                            <section class="card notification-card">
+                            <!-- 子页签 2：消息推送 -->
+                            <section class="card notification-card" id="settings-pane-push" hidden>
                                 <div class="card__head">
                                     <div>
-                                        <h2>运行结果通知</h2>
-                                        <p class="muted">支持 PushPlus、Server酱与自建 Bark；密钥落盘后不回显</p>
+                                        <h2>消息推送</h2>
+                                        <p class="muted">支持 PushPlus、Server酱与 Bark，右侧可实时预览样式</p>
                                     </div>
                                 </div>
-                                <form id="notification-form" class="notification-form">
-                                    <fieldset id="notification-fields" disabled>
-                                        <label class="check-row"><input type="checkbox" id="notification-enabled" /><span>开启运行结果推送</span></label>
-                                        <div class="field-row">
-                                            <label class="field">
-                                                <span class="field__label">通知渠道</span>
-                                                <select id="notification-provider">
-                                                    <option value="pushplus">PushPlus</option>
-                                                    <option value="serverchan">Server酱 Turbo</option>
-                                                    <option value="bark">Bark（自建服务）</option>
-                                                </select>
+                                <div class="notification-layout">
+                                    <form id="notification-form" class="notification-form">
+                                        <fieldset id="notification-fields" disabled>
+                                            <label class="check-row"><input type="checkbox" id="notification-enabled" /><span>开启签到结果自动推送</span></label>
+                                            <div class="field-row">
+                                                <label class="field">
+                                                    <span class="field__label">推送渠道</span>
+                                                    <select id="notification-provider">
+                                                        <option value="pushplus">PushPlus</option>
+                                                        <option value="serverchan">Server酱 Turbo</option>
+                                                        <option value="bark">Bark</option>
+                                                    </select>
+                                                </label>
+                                                <label class="field">
+                                                    <span class="field__label" id="notification-token-label">渠道密钥</span>
+                                                    <span class="field__control field__control--mono"><input type="password" id="notification-token" autocomplete="new-password" placeholder="填入 Token / SendKey" /></span>
+                                                </label>
+                                            </div>
+                                            <label class="field" id="notification-server-field" hidden>
+                                                <span class="field__label">Bark 服务器地址</span>
+                                                <span class="field__control field__control--mono"><input type="url" id="notification-server" placeholder="https://bark.example.com" autocomplete="off" /></span>
                                             </label>
-                                            <label class="field">
-                                                <span class="field__label" id="notification-token-label">渠道密钥</span>
-                                                <span class="field__control field__control--mono"><input type="password" id="notification-token" autocomplete="new-password" placeholder="填入渠道提供的 Token / SendKey" /></span>
-                                            </label>
-                                        </div>
-                                        <label class="field" id="notification-server-field" hidden>
-                                            <span class="field__label">Bark 服务器地址</span>
-                                            <span class="field__control field__control--mono"><input type="url" id="notification-server" placeholder="https://bark.example.com" autocomplete="off" /></span>
-                                        </label>
-                                        <div class="check-stack">
-                                            <label class="check-row"><input type="checkbox" id="notification-onlyProblems" /><span>仅在失败或部分完成时通知</span></label>
-                                            <label class="check-row"><input type="checkbox" id="notification-clear" /><span>清除已保存的渠道密钥</span></label>
-                                        </div>
-                                        <div class="form-actions">
-                                            <button class="liquid-btn liquid-btn--solid" type="submit" id="notification-save"><span class="liquid-btn__text">保存通知设置</span></button>
+                                            <div class="check-stack">
+                                                <label class="check-row"><input type="checkbox" id="notification-onlyProblems" /><span>仅在失败或部分完成时推送</span></label>
+                                                <label class="check-row"><input type="checkbox" id="notification-clear" /><span>清除已保存的渠道密钥</span></label>
+                                            </div>
+                                            <div class="form-actions">
+                                                <button class="liquid-btn liquid-btn--solid" type="submit" id="notification-save"><span class="liquid-btn__text">保存通知设置</span></button>
+                                                <button class="ghost-btn ghost-btn--bordered" type="button" id="notification-test">发送测试推送</button>
+                                            </div>
                                             <p id="notification-note" class="settings-note" role="status"></p>
+                                        </fieldset>
+                                    </form>
+
+                                    <div class="notify-preview" aria-label="推送样式预览">
+                                        <div class="notify-preview__head">
+                                            <div>
+                                                <span class="notify-preview__title">样式预览</span>
+                                                <span class="meta-chip" id="notify-preview-badge">PushPlus · HTML 卡片</span>
+                                            </div>
+                                            <div class="seg" id="notify-preview-states" role="group" aria-label="预览状态">
+                                                <button class="seg__item is-active" type="button" data-state="completed">已完成</button>
+                                                <button class="seg__item" type="button" data-state="partial">部分完成</button>
+                                                <button class="seg__item" type="button" data-state="failed">运行失败</button>
+                                            </div>
                                         </div>
-                                    </fieldset>
-                                </form>
+                                        <div class="notify-preview__stage" id="notify-preview-stage"></div>
+                                    </div>
+                                </div>
                             </section>
 
-                            <section class="card">
+                            <!-- 子页签 3：系统与环境 -->
+                            <section class="card" id="settings-pane-system" hidden>
                                 <div class="card__head">
                                     <div>
-                                        <h2>环境与连接设置</h2>
-                                        <p class="muted">面板访问密码、脚本仓库路径与上游 Control API 相互独立</p>
+                                        <h2>系统与环境</h2>
+                                        <p class="muted">面板访问密码、仓库目录、Control API 与依赖自检</p>
                                     </div>
                                 </div>
 
                                 <div class="settings-grid">
                                     <div class="settings-col">
                                         <div class="settings-block">
-                                            <h3 class="settings-group">① 面板访问</h3>
+                                            <h3 class="settings-group">面板访问密码</h3>
                                             <label class="field">
-                                                <span class="field__label">修改访问密码</span>
+                                                <span class="field__label">新密码</span>
                                                 <span class="field__control field__control--mono">
-                                                    <input id="s-panel-token" type="password" spellcheck="false" placeholder="至少 8 位；留空不修改" />
+                                                    <input id="s-panel-token" type="password" spellcheck="false" placeholder="至少 8 位，留空不修改" />
                                                     <button class="ghost-btn" type="button" data-reveal="s-panel-token">显示</button>
                                                 </span>
                                             </label>
@@ -695,25 +725,25 @@
                                         </div>
 
                                         <div class="settings-block">
-                                            <h3 class="settings-group">② 微软账号授权</h3>
+                                            <h3 class="settings-group">脚本仓库目录</h3>
                                             <label class="field">
-                                                <span class="field__label">脚本仓库根目录</span>
+                                                <span class="field__label">安装路径</span>
                                                 <span class="field__control field__control--mono"><input id="s-botdir" type="text" spellcheck="false" /></span>
                                             </label>
                                             <div class="form-actions">
                                                 <button class="ghost-btn ghost-btn--bordered" id="btn-recheck" type="button">重新自检</button>
-                                                <button class="ghost-btn ghost-btn--bordered" id="btn-save-bot" type="button">保存实例路径</button>
+                                                <button class="ghost-btn ghost-btn--bordered" id="btn-save-bot" type="button">保存路径</button>
                                             </div>
                                         </div>
 
                                         <div class="settings-block">
-                                            <h3 class="settings-group">③ 签到运行（Control API）</h3>
+                                            <h3 class="settings-group">Control API</h3>
                                             <label class="field">
-                                                <span class="field__label">Control API 地址</span>
+                                                <span class="field__label">接口地址</span>
                                                 <span class="field__control field__control--mono"><input id="s-control-api" type="text" spellcheck="false" placeholder="http://127.0.0.1:3010" /></span>
                                             </label>
                                             <label class="field">
-                                                <span class="field__label">Control API 令牌 <i>与面板密码无关</i></span>
+                                                <span class="field__label">API 令牌 <i>与面板密码无关</i></span>
                                                 <span class="field__control field__control--mono"><input id="s-control-token" type="password" spellcheck="false" placeholder="填入上游 API_TOKEN（可选）" /></span>
                                             </label>
                                             <label class="check-row" id="s-control-token-clear-wrap" hidden>
@@ -738,11 +768,11 @@
                     </div>
 
                     <footer class="appfoot" id="appfoot" hidden>
-                        <span class="appfoot__item">Rewards 控制台 v2.1</span>
+                        <span class="appfoot__item">Rewards 控制台</span>
                         <span class="appfoot__dot" aria-hidden="true"></span>
                         <span class="appfoot__item" id="appfoot-path">—</span>
                         <span class="appfoot__links">
-                            <a href="https://github.com/TheNetsky/Microsoft-Rewards-Script" target="_blank" rel="noreferrer">上游脚本 ↗</a>
+                            <a href="https://github.com/TheNetsky/Microsoft-Rewards-Script" target="_blank" rel="noreferrer">上游项目 ↗</a>
                         </span>
                     </footer>
                 </div>
@@ -755,7 +785,7 @@
                 <header class="dialog__head">
                     <div>
                         <h3 id="dlg-login-title">微软账号授权</h3>
-                        <p class="muted mono" id="dlg-login-sub">将打开可见浏览器完成登录</p>
+                        <p class="muted mono" id="dlg-login-sub">—</p>
                     </div>
                     <button class="icon-btn" type="button" data-close-dialog aria-label="关闭">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -788,7 +818,7 @@
 
                     <label class="check-row">
                         <input type="checkbox" id="opt-fresh" />
-                        <span>忽略已保存的 Cookie，重新授权（--fresh）</span>
+                        <span>忽略旧 Cookie 重新登录（--fresh）</span>
                     </label>
 
                     <div class="login-steps" id="login-steps" hidden></div>
@@ -802,10 +832,10 @@
 
                     <div class="remote-browser" id="remote-browser" role="status" hidden>
                         <div class="remote-browser__head">
-                            <strong>下一步：打开远程浏览器完成微软登录</strong>
+                            <strong>打开远程浏览器完成微软登录</strong>
                             <a class="liquid-btn liquid-btn--solid" id="remote-browser-link" target="_blank" rel="noopener"><span class="liquid-btn__text">打开远程浏览器 ↗</span></a>
                         </div>
-                        <p class="remote-browser__note" id="remote-browser-note">浏览器已就绪，请在新窗口输入账号信息或完成验证。</p>
+                        <p class="remote-browser__note" id="remote-browser-note">浏览器已就绪，请在新窗口完成登录。</p>
                     </div>
 
                     <ul class="verify-list" id="verify-list" hidden></ul>
@@ -817,41 +847,6 @@
                     <button class="ghost-btn ghost-btn--danger" id="btn-stop-login" type="button" hidden>终止授权</button>
                     <button class="liquid-btn liquid-btn--solid" id="btn-start-login" type="button"><span class="liquid-btn__text">启动浏览器授权</span></button>
                 </footer>
-            </div>
-        </dialog>
-
-        <!-- ── 条款 / 隐私 ───────────────────────────────────── -->
-        <dialog class="dialog" id="dlg-terms">
-            <div class="dialog__inner">
-                <header class="dialog__head">
-                    <h3>服务条款</h3>
-                    <button class="icon-btn" type="button" data-close-dialog aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-                </header>
-                <div class="dialog__body prose">
-                    <p>本控制台是 Microsoft-Rewards-Script 的本地图形前端，不提供任何托管服务，也不代持你的账号密码。</p>
-                    <ul>
-                        <li>你需要在有使用权的设备上运行它，并对自己的微软账号负责。</li>
-                        <li>自动化脚本可能违反微软服务条款，账号风险由使用者承担。</li>
-                        <li>面板会读写实例账号配置并启动浏览器进程；远程访问需要启用面板访问密码。</li>
-                    </ul>
-                </div>
-            </div>
-        </dialog>
-
-        <dialog class="dialog" id="dlg-privacy">
-            <div class="dialog__inner">
-                <header class="dialog__head">
-                    <h3>隐私说明</h3>
-                    <button class="icon-btn" type="button" data-close-dialog aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-                </header>
-                <div class="dialog__body prose">
-                    <ul>
-                        <li>账号配置与会话保存在实例本地。启用通知后，仅向你选择的渠道发送运行状态、账号数量与确认积分摘要。</li>
-                        <li>账号密码与 TOTP 密钥只写进实例目录的 <code>.env</code>（0600），这是上游脚本读取凭据的唯一来源。</li>
-                        <li>会话 Cookie 由微软签发，存在 <code>sessions.db</code>；面板只展示元信息（数量与时间），不会回显 Cookie 内容。</li>
-                        <li>面板密码保存在本地配置文件（0600），登录状态用 HttpOnly Cookie 维持。</li>
-                    </ul>
-                </div>
             </div>
         </dialog>
 

@@ -15,25 +15,53 @@ const data = '/data'
 fs.mkdirSync(path.join(data, 'sessions'), { recursive: true })
 const accountFile = path.join(data, 'accounts.env')
 if (!fs.existsSync(accountFile)) fs.writeFileSync(accountFile, '# Accounts managed by Rewards panel\n', { mode: 0o600 })
+
+const panelFile = process.env.PANEL_CONFIG || path.join(data, 'panel.json')
+const isV5 = fs.existsSync(path.join(root, 'dist/control-api/server.js'))
 const botConfig = path.join(data, 'bot-config.json')
-const sourceConfig = fs.existsSync(botConfig) ? botConfig : path.join(root, 'config.example.json')
+const freshConfig = !fs.existsSync(botConfig)
+const sourceConfig = freshConfig ? path.join(root, 'config.example.json') : botConfig
 const initial = JSON.parse(fs.readFileSync(sourceConfig, 'utf8'))
-initial.panelQueryMode ||= 'china'
-if (['china', 'china-local'].includes(initial.panelQueryMode)) {
-    initial.searchSettings.queryEngines = ['local']
+
+const queryModePath = path.join(path.dirname(panelFile), 'query-mode.json')
+let activeQueryMode = 'china'
+if (fs.existsSync(queryModePath)) {
+    try { activeQueryMode = JSON.parse(fs.readFileSync(queryModePath, 'utf8'))?.mode || 'china' } catch {}
+} else {
+    activeQueryMode = ['china', 'china-local', 'existing'].includes(initial.panelQueryMode) ? initial.panelQueryMode : 'china'
+    writeJson(queryModePath, { mode: activeQueryMode })
+}
+
+if (['china', 'china-local'].includes(activeQueryMode)) {
+    initial.searchSettings = { ...initial.searchSettings, queryEngines: ['local'] }
     initial.searchOnBingLocalQueries = true
 }
+
+if (isV5) {
+    // v5 默认启用纯 API 省内存模式与防断签，并清理旧版非标键以通过严格 Zod 校验
+    if (freshConfig || !['api', 'browser'].includes(initial.rewardsMode)) initial.rewardsMode = 'api'
+    if (typeof initial.ensureStreakProtection !== 'boolean') initial.ensureStreakProtection = true
+    if (initial.contintueOnBotWarning !== undefined) {
+        if (initial.continueOnBotWarning === undefined) initial.continueOnBotWarning = initial.contintueOnBotWarning
+        delete initial.contintueOnBotWarning
+    }
+    delete initial.panelQueryMode
+} else {
+    initial.panelQueryMode = activeQueryMode
+}
+
 writeJson(botConfig, lowMemoryConfig(initial, '/data/sessions'))
 for (const [name, target] of [['.env', accountFile], ['config.json', botConfig]]) {
     const file = path.join(root, name)
     if (fs.existsSync(file) || fs.lstatSync(file, { throwIfNoEntry: false })) fs.unlinkSync(file)
     fs.symlinkSync(target, file)
 }
-const panelFile = process.env.PANEL_CONFIG || path.join(data, 'panel.json')
+
 const activity = new ActivityStore(activityFile(panelFile))
 activity.interruptRunning()
 activity.prune()
 activity.close()
+
 const panel = fs.existsSync(panelFile) ? JSON.parse(fs.readFileSync(panelFile, 'utf8')) : {}
 panel.botDir = root
 panel.controlApi = 'http://127.0.0.1:3010'
@@ -41,7 +69,8 @@ panel.controlToken ||= randomBytes(24).toString('base64url')
 writeJson(panelFile, panel)
 
 const env = { ...process.env, PANEL_CONFIG: panelFile, PANEL_REMOTE_DESKTOP: '1' }
-const api = start(process.execPath, [path.join(root, 'scripts/api/server.js')], {
+const apiScript = isV5 ? path.join(root, 'dist/control-api/server.js') : path.join(root, 'scripts/api/server.js')
+const api = start(process.execPath, [apiScript], {
     cwd: root,
     env: {
         ...env, API_HOST: '127.0.0.1', API_PORT: '3010', API_TOKEN: panel.controlToken,

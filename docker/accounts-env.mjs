@@ -1,8 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-// Refresh account fields and the validated query profile for each API request.
-// Keep API tokens and other process settings out of the editable account file.
+// 每次 Control API 请求前刷新账号环境变量和国区词源模式，不触碰 API_TOKEN 等进程配置。
 export function refreshAccountEnv(projectRoot) {
     const raw = fs.readFileSync(path.join(projectRoot, '.env'), 'utf8')
     const accounts = {}
@@ -15,8 +14,19 @@ export function refreshAccountEnv(projectRoot) {
     }
     for (const key of Object.keys(process.env)) if (/^ACCOUNT_[1-9]\d*_/.test(key)) delete process.env[key]
     Object.assign(process.env, accounts)
-    try {
-        const mode = JSON.parse(fs.readFileSync(path.join(projectRoot, 'config.json'), 'utf8')).panelQueryMode
-        process.env.PANEL_QUERY_MODE = ['china', 'china-local'].includes(mode) ? mode : 'existing'
-    } catch { process.env.PANEL_QUERY_MODE = 'existing' }
+
+    let mode = null
+    const panelConfig = process.env.PANEL_CONFIG
+    if (panelConfig) {
+        try {
+            const qm = JSON.parse(fs.readFileSync(path.join(path.dirname(panelConfig), 'query-mode.json'), 'utf8'))?.mode
+            if (['china', 'china-local', 'existing'].includes(qm)) mode = qm
+        } catch {}
+    }
+    if (!mode) {
+        try {
+            mode = JSON.parse(fs.readFileSync(path.join(projectRoot, 'config.json'), 'utf8')).panelQueryMode
+        } catch {}
+    }
+    process.env.PANEL_QUERY_MODE = ['china', 'china-local'].includes(mode) ? mode : 'existing'
 }

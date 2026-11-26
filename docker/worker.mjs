@@ -3,6 +3,7 @@ import path from 'node:path'
 import { lowMemoryConfig, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
 import { createRunRecorder } from '../lib/run-recorder.mjs'
 import { notifyRun } from '../lib/notifications.mjs'
+import { readQueryMode } from '../lib/task-settings.mjs'
 
 const root = process.env.BOT_DIR || '/opt/rewards'
 const mode = process.argv[2]
@@ -56,7 +57,8 @@ try {
     } else {
         const file = path.join(root, 'config.json')
         const config = lowMemoryConfig(JSON.parse(fs.readFileSync(file, 'utf8')))
-        env.PANEL_QUERY_MODE = config.panelQueryMode || 'existing'
+        const panelFile = process.env.PANEL_CONFIG || '/data/panel.json'
+        env.PANEL_QUERY_MODE = readQueryMode(panelFile, config) || 'existing'
         writeJson(file, config)
         delete env.DISPLAY
         env.FORCE_HEADLESS = '1'

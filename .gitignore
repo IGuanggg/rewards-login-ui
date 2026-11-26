@@ -1,15 +1,23 @@
-# 面板自身配置：含访问密码，绝不提交
+# 面板配置与本地状态（含密码/密钥）
 config.json
+notifications.json
+notifications.json.tmp
+query-mode.json
+query-mode.json.tmp
+schedule.json
+schedule.json.tmp
 
-# 凭据与备份
+# 账号凭据与备份
 .env
 .env.*
 *.panel.bak
 
-# 运行时会话库
+# 运行时会话与数据库
 sessions/
 dist/sessions/
 src/sessions/
+data/
+activity.db*
 
 # 依赖与构建
 node_modules/
@@ -25,15 +33,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# ����Ʊ��ݣ����������棩
+# 本地测试与截图产物
+docs/acceptance-rerun.json
+docs/shots/
 docs/design-backup-*/
-
-# Docker persistent credentials and sessions
-data/
-
-# Persistent sign-in activity journal
-activity.db*
-
-# Local notification credentials
-notifications.json
-notifications.json.tmp
