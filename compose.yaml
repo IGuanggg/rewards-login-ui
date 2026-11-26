@@ -1,6 +1,12 @@
 services:
   rewards:
-    build: .
+    build:
+      context: .
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1}
+        NPM_REGISTRY: ${NPM_REGISTRY:-}
     init: true
     restart: unless-stopped
     ports:

@@ -9,7 +9,7 @@ import { once } from 'node:events'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createDesktopProxy } from '../lib/desktop-proxy.mjs'
-import { lowMemoryConfig } from '../docker/runtime.mjs'
+import { lowMemoryConfig, migrateConfigToTemplate } from '../docker/runtime.mjs'
 import { refreshAccountEnv } from '../docker/accounts-env.mjs'
 
 function scratch(t) {
@@ -33,6 +33,46 @@ test('low-memory settings preserve user workers and force sequential searches', 
     assert.equal(config.searchSettings.maxBonusSearches, 30)
     assert.deepEqual(config.workers, original.workers)
     assert.equal(original.clusters, 8)
+})
+
+test('v4-to-v5 config migration preserves user values, seeds new v5 defaults, and strips removed v4 keys', () => {
+    const legacyV4 = {
+        baseURL: 'https://rewards.bing.com',
+        sessionPath: '/data/sessions',
+        headless: true,
+        clusters: 1,
+        contintueOnBotWarning: false,
+        panelQueryMode: 'china',
+        workers: { doDailySet: false, doMobileSearch: true, doLegacyRemovedWorker: true },
+        searchSettings: { retryMobileSearchAmount: 2, searchDelay: { min: '2min', max: '4min' }, queryEngines: ['local'] },
+        proxy: { proxyGoogleTrends: true, queryEngine: false }
+    }
+    const v5Template = {
+        sessionPath: 'sessions',
+        headless: false,
+        clusters: 1,
+        rewardsMode: 'browser',
+        ensureStreakProtection: true,
+        continueOnBotWarning: false,
+        taskDelay: { min: '15sec', max: '30sec' },
+        workers: { doDailySet: true, doMobileSearch: true, doVisualSearch: true },
+        searchSettings: { parallelSearching: true, searchDelay: { min: '30sec', max: '1min' }, queryEngines: ['google', 'local'] },
+        proxy: { queryEngine: true, ignoreCertificateErrors: false }
+    }
+    legacyV4.continueOnBotWarning = legacyV4.contintueOnBotWarning
+    const migrated = migrateConfigToTemplate(legacyV4, v5Template)
+    assert.equal(migrated.baseURL, undefined)
+    assert.equal(migrated.panelQueryMode, undefined)
+    assert.equal(migrated.contintueOnBotWarning, undefined)
+    assert.equal(migrated.workers.doLegacyRemovedWorker, undefined)
+    assert.equal(migrated.searchSettings.retryMobileSearchAmount, undefined)
+    assert.equal(migrated.proxy.proxyGoogleTrends, undefined)
+    assert.equal(migrated.workers.doDailySet, false)
+    assert.equal(migrated.workers.doVisualSearch, true)
+    assert.deepEqual(migrated.searchSettings.searchDelay, { min: '2min', max: '4min' })
+    assert.equal(migrated.proxy.queryEngine, false)
+    assert.equal(migrated.proxy.ignoreCertificateErrors, false)
+    assert.deepEqual(migrated.taskDelay, { min: '15sec', max: '30sec' })
 })
 
 test('editing accounts replaces cached accounts without changing API credentials', t => {

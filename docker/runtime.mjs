@@ -4,6 +4,28 @@ import { spawn } from 'node:child_process'
 
 export const LOCK_FILE = '/tmp/rewards-browser.lock'
 
+const isPlain = v => Boolean(v) && typeof v === 'object' && !Array.isArray(v)
+
+/**
+ * 将旧版（如 v4.x）bot-config.json 按新版 template（v5 config.example.json）递归清洗：
+ * 保留用户已配置的同名字段，补齐新版新增默认字段，剔除已废弃字段以通过 v5 严格 Zod 校验。
+ */
+export function migrateConfigToTemplate(existing, template) {
+    if (!isPlain(template)) return existing === undefined ? structuredClone(template) : existing
+    const src = isPlain(existing) ? existing : {}
+    const out = {}
+    for (const [key, fallback] of Object.entries(template)) {
+        if (src[key] === undefined) {
+            out[key] = structuredClone(fallback)
+        } else if (isPlain(fallback) && isPlain(src[key])) {
+            out[key] = migrateConfigToTemplate(src[key], fallback)
+        } else {
+            out[key] = structuredClone(src[key])
+        }
+    }
+    return out
+}
+
 export function lowMemoryConfig(config, sessionPath) {
     return {
         ...config,

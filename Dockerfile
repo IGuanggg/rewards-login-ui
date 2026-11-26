@@ -1,10 +1,14 @@
 FROM node:24-bookworm-slim AS builder
 ARG UPSTREAM_REF=b78f6165f1d167d2906f662e1885c0cca528b255
+ARG UPSTREAM_TARBALL_URL=https://codeload.github.com/TheNetsky/Microsoft-Rewards-Script/tar.gz/${UPSTREAM_REF}
+ARG NPM_REGISTRY=
 WORKDIR /opt/rewards
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
-    && curl --fail --location --retry 3 "https://codeload.github.com/TheNetsky/Microsoft-Rewards-Script/tar.gz/${UPSTREAM_REF}" -o /tmp/upstream.tar.gz \
-    && tar -xzf /tmp/upstream.tar.gz --strip-components=1 -C /opt/rewards
-RUN npm ci --include=dev --ignore-scripts && npm run build \
+    && curl --fail --location --retry 3 "${UPSTREAM_TARBALL_URL}" -o /tmp/upstream.tar.gz \
+    && tar -xzf /tmp/upstream.tar.gz --strip-components=1 -C /opt/rewards \
+    && rm -f /tmp/upstream.tar.gz
+RUN if [ -n "${NPM_REGISTRY}" ]; then npm config set registry "${NPM_REGISTRY}"; fi \
+    && npm ci --include=dev --ignore-scripts && npm run build \
     && rm -rf node_modules && npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 FROM node:24-bookworm-slim
@@ -21,8 +25,8 @@ COPY --from=builder /opt/rewards/dist ./dist
 COPY --from=builder /opt/rewards/scripts ./scripts
 COPY --from=builder /opt/rewards/config.example.json ./config.example.json
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 xvfb x11vnc novnc websockify util-linux ca-certificates fonts-noto-cjk fonts-noto-color-emoji \
-    && npx --no-install patchright install --with-deps chromium \
+    python3 xvfb x11vnc novnc websockify util-linux procps tzdata ca-certificates fonts-noto-cjk fonts-noto-color-emoji \
+    && ./node_modules/.bin/patchright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /root/.npm
 WORKDIR /opt/panel
 COPY package.json server.js ./

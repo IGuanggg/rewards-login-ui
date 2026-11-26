@@ -3,7 +3,7 @@ import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { LOCK_FILE, lowMemoryConfig, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
+import { LOCK_FILE, lowMemoryConfig, migrateConfigToTemplate, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
 import { ActivityStore, activityFile } from '../lib/activity-store.mjs'
 import { readSchedule, scheduleDate } from '../lib/task-settings.mjs'
 
@@ -19,35 +19,37 @@ if (!fs.existsSync(accountFile)) fs.writeFileSync(accountFile, '# Accounts manag
 const panelFile = process.env.PANEL_CONFIG || path.join(data, 'panel.json')
 const isV5 = fs.existsSync(path.join(root, 'dist/control-api/server.js'))
 const botConfig = path.join(data, 'bot-config.json')
+const templatePath = path.join(root, 'config.example.json')
 const freshConfig = !fs.existsSync(botConfig)
-const sourceConfig = freshConfig ? path.join(root, 'config.example.json') : botConfig
-const initial = JSON.parse(fs.readFileSync(sourceConfig, 'utf8'))
+const templateConfig = fs.existsSync(templatePath) ? JSON.parse(fs.readFileSync(templatePath, 'utf8')) : null
+const rawExisting = freshConfig ? structuredClone(templateConfig || {}) : JSON.parse(fs.readFileSync(botConfig, 'utf8'))
 
 const queryModePath = path.join(path.dirname(panelFile), 'query-mode.json')
 let activeQueryMode = 'china'
 if (fs.existsSync(queryModePath)) {
     try { activeQueryMode = JSON.parse(fs.readFileSync(queryModePath, 'utf8'))?.mode || 'china' } catch {}
 } else {
-    activeQueryMode = ['china', 'china-local', 'existing'].includes(initial.panelQueryMode) ? initial.panelQueryMode : 'china'
+    activeQueryMode = ['china', 'china-local', 'existing'].includes(rawExisting.panelQueryMode) ? rawExisting.panelQueryMode : 'china'
     writeJson(queryModePath, { mode: activeQueryMode })
+}
+
+let initial = rawExisting
+if (isV5) {
+    // 兼容旧版拼写并按 v5 模板清洗废弃键，避免 v5 严格 Zod 校验失败
+    if (rawExisting.contintueOnBotWarning !== undefined && rawExisting.continueOnBotWarning === undefined) {
+        rawExisting.continueOnBotWarning = rawExisting.contintueOnBotWarning
+    }
+    if (templateConfig) initial = migrateConfigToTemplate(rawExisting, templateConfig)
+    if (freshConfig || !['api', 'browser'].includes(rawExisting.rewardsMode)) initial.rewardsMode = 'api'
+    if (typeof rawExisting.ensureStreakProtection !== 'boolean') initial.ensureStreakProtection = true
+    delete initial.panelQueryMode
+} else {
+    initial.panelQueryMode = activeQueryMode
 }
 
 if (['china', 'china-local'].includes(activeQueryMode)) {
     initial.searchSettings = { ...initial.searchSettings, queryEngines: ['local'] }
     initial.searchOnBingLocalQueries = true
-}
-
-if (isV5) {
-    // v5 默认启用纯 API 省内存模式与防断签，并清理旧版非标键以通过严格 Zod 校验
-    if (freshConfig || !['api', 'browser'].includes(initial.rewardsMode)) initial.rewardsMode = 'api'
-    if (typeof initial.ensureStreakProtection !== 'boolean') initial.ensureStreakProtection = true
-    if (initial.contintueOnBotWarning !== undefined) {
-        if (initial.continueOnBotWarning === undefined) initial.continueOnBotWarning = initial.contintueOnBotWarning
-        delete initial.contintueOnBotWarning
-    }
-    delete initial.panelQueryMode
-} else {
-    initial.panelQueryMode = activeQueryMode
 }
 
 writeJson(botConfig, lowMemoryConfig(initial, '/data/sessions'))

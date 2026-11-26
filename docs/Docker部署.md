@@ -9,6 +9,12 @@ docker compose up -d --build
 docker compose logs --tail=60 rewards
 ```
 
+国内服务器构建时如需走局域网代理（如 mihomo，加快拉取 GitHub 源码与 Chrome 156）：
+
+```bash
+HTTP_PROXY=http://宿主机局域网IP:代理端口 HTTPS_PROXY=http://宿主机局域网IP:代理端口 docker compose up -d --build
+```
+
 首次启动日志会打印访问密码，也可在环境变量中通过 `PANEL_TOKEN` 指定。
 
 默认仅映射 `127.0.0.1:4173`，通过 SSH 隧道在本地访问：

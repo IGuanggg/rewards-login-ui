@@ -49,13 +49,17 @@ try {
     assert.ok(store.logs(day.runs[0].id).logs.some(log => log.title === 'PANEL-WAIT'))
     console.log('\nPASS durable activity journal, real upstream parser, task points, and split UTF-8 output')
     const fixture = path.join(dir, 'synthetic-bot')
+    const isV5 = fs.existsSync('/opt/rewards/dist/control-api/logs/parse.js')
     fs.mkdirSync(path.join(fixture, 'dist'), { recursive: true })
-    fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}')
+    fs.writeFileSync(path.join(fixture, 'package.json'), isV5 ? '{"name":"synthetic-bot"}' : '{"type":"module"}')
     fs.writeFileSync(path.join(fixture, 'config.json'), '{"sessionPath":"sessions","searchSettings":{}}')
     fs.writeFileSync(path.join(fixture, 'dist/index.js'), emitter)
-    if (fs.existsSync('/opt/rewards/dist/control-api/logs/parse.js')) {
-        for (const rel of ['dist/control-api', 'dist/logging', 'dist/rewards', 'scripts/lib']) {
+    if (isV5) {
+        for (const rel of ['dist/control-api', 'dist/logging', 'dist/rewards', 'dist/util', 'scripts/lib']) {
             if (fs.existsSync(path.join('/opt/rewards', rel))) fs.cpSync(path.join('/opt/rewards', rel), path.join(fixture, rel), { recursive: true })
+        }
+        if (fs.existsSync('/opt/rewards/node_modules')) {
+            fs.symlinkSync('/opt/rewards/node_modules', path.join(fixture, 'node_modules'), 'junction')
         }
     } else {
         fs.mkdirSync(path.join(fixture, 'scripts/api'), { recursive: true })
