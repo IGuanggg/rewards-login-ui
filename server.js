@@ -1753,7 +1753,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         if (pathname === '/api/health' && req.method === 'GET') {
-            return json(res, 200, { ok: true, version: '2.0.0' })
+            return json(res, 200, { ok: true, version: '2.2.0' })
         }
 
         if (pathname.startsWith('/api/')) return json(res, 404, { error: '未知接口' })

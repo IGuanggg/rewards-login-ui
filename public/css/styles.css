@@ -1113,6 +1113,40 @@ select:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
 .mini-btn--ghost:hover:not(:disabled) { background: var(--btn-secondary-bg); color: var(--fg); }
 .mini-btn--danger { background: transparent; color: var(--fg-faint); padding: 0 9px; box-shadow: none; }
 .mini-btn--danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+.mini-btn--danger-solid { background: var(--danger-soft); color: var(--danger); box-shadow: none; font-weight: 500; }
+.mini-btn--danger-solid:hover:not(:disabled) { background: var(--danger-dot); color: #ffffff; }
+
+/* 账号页后台运行横幅 & 弹窗占用提示 */
+.run-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 14px;
+    padding: 14px 18px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--accent-border);
+    background: var(--accent-soft);
+}
+.run-banner__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex: none; box-shadow: 0 0 0 4px var(--accent-ring); }
+.run-banner__body { flex: 1; min-width: 200px; display: grid; gap: 2px; }
+.run-banner__body strong { font-size: 13.5px; font-weight: 600; color: var(--fg); }
+.run-banner__body p { margin: 0; font-size: 12.5px; color: var(--fg-muted); }
+.run-banner__actions { display: flex; align-items: center; gap: 8px; }
+
+.login-busy {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 14px;
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--warning-border);
+    background: var(--warning-soft);
+}
+.login-busy__body { flex: 1; min-width: 200px; display: grid; gap: 2px; }
+.login-busy__body strong { font-size: 13px; font-weight: 600; color: var(--warning); }
+.login-busy__body p { margin: 0; font-size: 12px; color: var(--fg-muted); }
 
 .empty-state { padding: 52px 20px; text-align: center; display: grid; justify-items: center; gap: 8px; }
 .empty-state__icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--well); color: var(--fg-muted); margin-bottom: 4px; }

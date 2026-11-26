@@ -784,6 +784,7 @@ function openLoginDialog(account) {
     $('#btn-stop-login').hidden = true
     $('#btn-start-login').disabled = false
     $('.liquid-btn__text', $('#btn-start-login')).textContent = '启动浏览器授权'
+    runConsole.render()
     $('#dlg-login').showModal()
 
     // 已有任务则接管显示
@@ -941,8 +942,16 @@ async function handleStartLogin() {
         toast('info', '授权已启动，请按页面提示完成微软登录')
     } catch (error) {
         if (error.status === 401) return showUnlock('会话已过期，请重新输入访问密码')
-        toast('error', error.message)
+        const hint = $('#job-hint')
+        if (hint) {
+            hint.textContent = error.message
+            hint.hidden = false
+        }
+        $('#job-status').dataset.state = 'failed'
+        $('.job-status__text').textContent = '无法启动授权'
         button.disabled = false
+        $('.liquid-btn__text', button).textContent = '启动浏览器授权'
+        runConsole.refresh(true)
     }
 }
 
@@ -1161,6 +1170,10 @@ function bindEvents() {
     $('#btn-refresh').addEventListener('click', () => {
         refreshAccounts()
         refreshRuns()
+        runConsole.refresh(true)
+    })
+    $('#btn-accounts-view-run')?.addEventListener('click', () => {
+        $('#tabs [data-tab="dashboard"]').click()
     })
 
     $('#account-list').addEventListener('click', async event => {

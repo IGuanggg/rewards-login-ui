@@ -105,7 +105,42 @@ export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
         $('#run-next-action').onclick = () => view.action === 'refresh' ? refresh(true) : onAction(view.action, view.email, info)
         const schedule = info?.schedule
         $('#run-schedule').textContent = schedule?.enabled ? `每日 ${schedule.runAt} 自动签到（${schedule.timezone}）` : '未开启定时'
-        for (const button of document.querySelectorAll('#account-list [data-act="run"]')) button.disabled = view.active || Boolean(info?.authorization) || info?.state !== 'idle'
+        const runDisabled = view.active || Boolean(info?.authorization) || info?.state !== 'idle'
+        const runTitle = view.active
+            ? '后台签到运行中，请先停止或等待完成后再单独运行'
+            : info?.authorization
+              ? '正在进行账号授权，请完成后重试'
+              : info?.state !== 'idle'
+                ? '签到服务暂未就绪'
+                : ''
+        for (const button of document.querySelectorAll('#account-list [data-act="run"]')) {
+            button.disabled = runDisabled
+            button.title = runTitle
+        }
+        const accountsBanner = $('#accounts-run-banner')
+        if (accountsBanner) {
+            accountsBanner.hidden = !view.active
+            const titleEl = $('#accounts-run-title')
+            const descEl = $('#accounts-run-desc')
+            const stopBtn = $('#btn-accounts-stop-run')
+            if (titleEl) titleEl.textContent = `${view.badge} · ${view.account}`
+            if (descEl) descEl.textContent = `${view.description}（运行期间无法单独运行账号或打开授权浏览器）`
+            if (stopBtn) {
+                stopBtn.disabled = view.stopDisabled
+                stopBtn.textContent = view.stopDisabled ? '正在停止…' : '停止运行'
+            }
+        }
+        const loginBusy = $('#login-busy-banner')
+        if (loginBusy) {
+            loginBusy.hidden = !view.active
+            const busyText = $('#login-busy-text')
+            const loginStopBtn = $('#btn-login-stop-run')
+            if (busyText) busyText.textContent = `${view.description} 需先停止签到或等本轮结束后再启动授权。`
+            if (loginStopBtn) {
+                loginStopBtn.disabled = view.stopDisabled
+                loginStopBtn.textContent = view.stopDisabled ? '正在停止…' : '先停止签到'
+            }
+        }
     }
     async function refresh(clearError = false) {
         if (!active) return
@@ -157,6 +192,8 @@ export function createRunConsole({ api, onUnauthorized, onStart, onAction }) {
     document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(timer); else if (active) void refresh() })
     $('#btn-run-all').addEventListener('click', () => start())
     $('#btn-stop-run').addEventListener('click', stopRun)
+    $('#btn-accounts-stop-run')?.addEventListener('click', stopRun)
+    $('#btn-login-stop-run')?.addEventListener('click', stopRun)
     $('#btn-run-records').addEventListener('click', () => onAction('logs', null, info))
-    return { start, refresh, render, stop, open() { active = true; clearInterval(tick); tick = setInterval(() => { if (!document.hidden && ACTIVE.has(info?.state)) render() }, 1000); void refresh() } }
+    return { start, stopRun, refresh, render, stop, isActive: () => ACTIVE.has(info?.state) || Boolean(pending), open() { active = true; clearInterval(tick); tick = setInterval(() => { if (!document.hidden && ACTIVE.has(info?.state)) render() }, 1000); void refresh() } }
 }

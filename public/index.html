@@ -331,6 +331,18 @@
                                 </div>
                             </header>
 
+                            <section class="run-banner" id="accounts-run-banner" role="status" hidden>
+                                <span class="run-banner__dot" aria-hidden="true"></span>
+                                <div class="run-banner__body">
+                                    <strong id="accounts-run-title">后台签到运行中</strong>
+                                    <p id="accounts-run-desc">当前有签到任务正在执行，期间无法单独启动账号或开启浏览器登录。</p>
+                                </div>
+                                <div class="run-banner__actions">
+                                    <button class="mini-btn" id="btn-accounts-view-run" type="button">查看进度</button>
+                                    <button class="mini-btn mini-btn--danger-solid" id="btn-accounts-stop-run" type="button">停止运行</button>
+                                </div>
+                            </section>
+
                             <ul class="account-grid" id="account-list"></ul>
 
                             <section class="card empty-state" id="accounts-empty" hidden>
@@ -793,6 +805,14 @@
                 </header>
 
                 <div class="dialog__body">
+                    <div class="login-busy" id="login-busy-banner" role="alert" hidden>
+                        <div class="login-busy__body">
+                            <strong>当前有后台签到正在运行</strong>
+                            <p id="login-busy-text">授权浏览器与签到任务不能同时运行，请先停止签到或等待结束。</p>
+                        </div>
+                        <button class="mini-btn mini-btn--danger-solid" id="btn-login-stop-run" type="button">先停止签到</button>
+                    </div>
+
                     <div class="session-overview" id="login-session-state"></div>
 
                     <div class="platform-section">
