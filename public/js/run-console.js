@@ -1,6 +1,12 @@
 const ACTIVE = new Set(['starting', 'running', 'stopping'])
 const LABELS = { completed: '本轮已完成', partial: '本轮部分完成', failed: '本轮运行失败', cancelled: '本轮已停止', interrupted: '上次运行被中断' }
 const LOGIN_ERR_RE = /login|sign.?in|authenticate|authentication|verification|captcha|登录|验证|会话/i
+const isRealLoginError = text => {
+    const value = String(text || '')
+    if (!value) return false
+    const cleaned = value.replace(/Search:\s*Bing request left the authenticated Bing session/gi, '').replace(/Bing request left the authenticated Bing session/gi, '')
+    return LOGIN_ERR_RE.test(cleaned)
+}
 export function waitMessage(delay, now = Date.now()) {
     if (!delay || !Number.isFinite(delay.seconds)) return null
     const since = typeof delay.sinceTs === 'number' ? delay.sinceTs : Date.parse(delay.sinceTs)
@@ -24,10 +30,10 @@ export function runView(info, { pending = null, error = null } = {}) {
     const tasks = sameRun ? latest?.tasks || [] : []
     const current = tasks.filter(task => task.state === 'running').sort((a, b) => b.updatedAt - a.updatedAt)[0]
     const failed = latest?.tasks?.find(task => ['failed', 'partial', 'incomplete'].includes(task.state))
-    const accountError = latest?.run?.accounts?.find(account => account.error && LOGIN_ERR_RE.test(account.error))
+    const accountError = latest?.run?.accounts?.find(account => account.error && isRealLoginError(account.error))
         || latest?.run?.accounts?.find(account => account.error)
     const failure = accountError?.error || failed?.message || info?.lastExit?.error || ''
-    const loginError = LOGIN_ERR_RE.test(failure)
+    const loginError = isRealLoginError(failure)
     const newerExit = info?.lastExit && (!latest || Date.parse(info.lastExit.at) > (latest.run.endedAt || latest.run.updatedAt) + 15000)
     let view = {
         active, stopDisabled: !active || pending === 'stop' || live === 'stopping',

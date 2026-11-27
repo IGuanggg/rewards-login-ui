@@ -73,13 +73,13 @@ function ago(ts) {
     return `${Math.floor(diff / 86_400_000)} 天前`
 }
 
-async function api(pathname, { method = 'GET', body } = {}) {
+async function api(pathname, { method = 'GET', body, timeout = 12000 } = {}) {
     const response = await fetch(pathname, {
         method,
         credentials: 'same-origin',
         headers: body ? { 'Content-Type': 'application/json' } : undefined,
         body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(12000)
+        signal: AbortSignal.timeout(timeout)
     }).catch(error => {
         if (error.name === 'TimeoutError' || error.name === 'AbortError') throw new Error('请求超时，请重试')
         throw error
@@ -439,10 +439,28 @@ async function refreshAccounts() {
     }
 }
 
+function sessionStatusOf(session) {
+    if (!session?.cookies) return 'missing'
+    return session.status || 'valid'
+}
+
+function isSessionHealthy(session) {
+    const st = sessionStatusOf(session)
+    return st === 'valid' || st === 'expiring'
+}
+
+function formatDaysLeft(daysLeft) {
+    if (daysLeft == null || !Number.isFinite(Number(daysLeft))) return ''
+    const n = Number(daysLeft)
+    if (n <= 0) return '已到期'
+    if (n < 1) return '剩 <1 天'
+    return `剩 ${Math.ceil(n)} 天`
+}
+
 function sessionTile(label, session) {
-    const ok = Boolean(session?.cookies)
-    if (!ok) {
-        return `<div class="session-tile" data-ok="false">
+    const status = sessionStatusOf(session)
+    if (status === 'missing') {
+        return `<div class="session-tile" data-ok="false" data-status="missing">
             <span class="session-tile__dot" aria-hidden="true"></span>
             <div class="session-tile__body">
                 <strong>${label}</strong>
@@ -450,9 +468,33 @@ function sessionTile(label, session) {
             </div>
         </div>`
     }
-    const when = session.updatedAt ? ago(session.updatedAt) : '已保存'
-    const detail = `${when} · ${session.cookies} CK`
-    return `<div class="session-tile" data-ok="true" title="${label}已保存 · ${session.cookies} cookies">
+    const daysText = formatDaysLeft(session.daysLeft)
+    if (status === 'invalid' || status === 'expired') {
+        const detail = status === 'expired' ? 'CK 已过期 · 需重登' : '会话已失效 · 需重登'
+        const tip = session.reason || detail
+        return `<div class="session-tile" data-ok="false" data-status="${status}" title="${escapeHtml(`${label}：${tip}`)}">
+            <span class="session-tile__dot" aria-hidden="true"></span>
+            <div class="session-tile__body">
+                <strong>${label}</strong>
+                <span>${escapeHtml(detail)}</span>
+            </div>
+        </div>`
+    }
+    if (status === 'expiring') {
+        const detail = daysText ? `即将过期 · ${daysText}` : '建议刷新会话'
+        const tip = session.reason || detail
+        return `<div class="session-tile" data-ok="false" data-status="expiring" title="${escapeHtml(`${label}：${tip}`)}">
+            <span class="session-tile__dot" aria-hidden="true"></span>
+            <div class="session-tile__body">
+                <strong>${label}</strong>
+                <span>${escapeHtml(detail)}</span>
+            </div>
+        </div>`
+    }
+    const when = session.checkSource === 'probe' && session.checkedAt ? `已验证 · ${ago(session.checkedAt)}` : session.updatedAt ? ago(session.updatedAt) : '已保存'
+    const detail = [when, `${session.cookies} CK`, daysText].filter(Boolean).join(' · ')
+    const tip = `${label}有效 · ${session.cookies} cookies${daysText ? ` · ${daysText}` : ''}${session.checkSource === 'probe' && session.checkedAt ? ` · 上次实测 ${timeOf(session.checkedAt)}` : ''}`
+    return `<div class="session-tile" data-ok="true" data-status="valid" title="${escapeHtml(tip)}">
         <span class="session-tile__dot" aria-hidden="true"></span>
         <div class="session-tile__body">
             <strong>${label}</strong>
@@ -461,10 +503,42 @@ function sessionTile(label, session) {
     </div>`
 }
 
+function renderSessionAlertBanner() {
+    const banner = $('#accounts-session-alert')
+    if (!banner) return
+    const alerts = state.accounts?.sessionAlerts || []
+    if (!alerts.length) {
+        banner.hidden = true
+        return
+    }
+    const invalid = alerts.filter(item => item.status === 'invalid' || item.status === 'expired')
+    const expiring = alerts.filter(item => item.status === 'expiring')
+    banner.hidden = false
+    banner.dataset.tone = invalid.length ? 'danger' : 'warn'
+    $('#accounts-session-alert-title').textContent = invalid.length
+        ? `检测到 ${invalid.length} 处会话（CK）已失效${expiring.length ? `，另有 ${expiring.length} 处即将过期` : ''}`
+        : `有 ${expiring.length} 处会话（CK）即将过期`
+    const first = invalid[0] || expiring[0]
+    const listText = alerts
+        .slice(0, 3)
+        .map(a => `${a.email}（${a.platform === 'mobile' ? '手机端' : '电脑端'}·${a.status === 'expiring' ? '即将过期' : a.status === 'expired' ? '已过期' : '已失效'}）`)
+        .join('；')
+    $('#accounts-session-alert-desc').textContent = `${listText}${alerts.length > 3 ? ` 等共 ${alerts.length} 处` : ''}。请重新完成微软授权以免影响自动签到。`
+    const fixBtn = $('#btn-accounts-fix-session')
+    if (fixBtn) {
+        fixBtn.textContent = invalid.length ? '去重新登录' : '提前刷新登录'
+        fixBtn.onclick = () => {
+            const target = state.accounts?.accounts?.find(a => a.email.toLowerCase() === first.email.toLowerCase())
+            if (target) openLoginDialog(target)
+        }
+    }
+}
+
 function renderAccounts() {
     const list = $('#account-list')
     const empty = $('#accounts-empty')
     const accounts = state.accounts?.accounts ?? []
+    renderSessionAlertBanner()
 
     if (!accounts.length) {
         list.innerHTML = ''
@@ -475,10 +549,14 @@ function renderAccounts() {
 
     list.innerHTML = accounts
         .map(account => {
-            const hasMobile = Boolean(account.sessions?.mobile?.cookies)
-            const hasDesktop = Boolean(account.sessions?.desktop?.cookies)
+            const hasMobile = isSessionHealthy(account.sessions?.mobile)
+            const hasDesktop = isSessionHealthy(account.sessions?.desktop)
+            const mobileBad = ['invalid', 'expired'].includes(sessionStatusOf(account.sessions?.mobile))
+            const desktopBad = ['invalid', 'expired'].includes(sessionStatusOf(account.sessions?.desktop))
+            const anyInvalid = mobileBad || desktopBad
             const connected = hasMobile || hasDesktop
             const bothReady = hasMobile && hasDesktop
+            const authLabel = anyInvalid ? '重新登录' : connected ? (bothReady ? '管理登录' : '补全登录') : '登录账号'
             const extra = [
                 account.hasPassword ? '已存密码' : '',
                 account.hasTotp ? '2FA' : '',
@@ -502,7 +580,7 @@ function renderAccounts() {
                 </div>
                 <div class="account-item__actions">
                     <button class="mini-btn" type="button" data-act="run">运行签到</button>
-                    <button class="mini-btn${bothReady ? '' : ' mini-btn--primary'}" type="button" data-act="authorize">${connected ? (bothReady ? '管理登录' : '补全登录') : '登录账号'}</button>
+                    <button class="mini-btn${bothReady ? '' : ' mini-btn--primary'}" type="button" data-act="authorize">${authLabel}</button>
                     <button class="mini-btn mini-btn--ghost mini-btn--spacer" type="button" data-act="edit">编辑</button>
                     <button class="mini-btn mini-btn--danger" type="button" data-act="delete">删除</button>
                 </div>
@@ -692,10 +770,10 @@ const PLATFORM_HINT = {
 }
 
 function pickDefaultPlatform(account) {
-    const hasMobile = Boolean(account?.sessions?.mobile?.cookies)
-    const hasDesktop = Boolean(account?.sessions?.desktop?.cookies)
-    if (!hasMobile && hasDesktop) return 'mobile'
-    if (hasMobile && !hasDesktop) return 'desktop'
+    const mobileOk = sessionStatusOf(account?.sessions?.mobile) === 'valid'
+    const desktopOk = sessionStatusOf(account?.sessions?.desktop) === 'valid'
+    if (!mobileOk && desktopOk) return 'mobile'
+    if (mobileOk && !desktopOk) return 'desktop'
     return 'both'
 }
 
@@ -719,9 +797,15 @@ function renderLoginSessionState(account) {
     ]
     box.innerHTML = items
         .map(({ label, session }) => {
-            const ok = Boolean(session?.cookies)
-            const meta = ok ? `已连接 · ${session.cookies} cookies · ${ago(session.updatedAt) || '已保存'}` : '尚未登录'
-            return `<div class="session-card" data-ok="${ok}">
+            const status = sessionStatusOf(session)
+            const ok = status === 'valid'
+            const daysText = formatDaysLeft(session?.daysLeft)
+            let meta = '尚未登录'
+            if (status === 'invalid') meta = session?.reason || '会话已失效，需重新授权'
+            else if (status === 'expired') meta = session?.reason || 'Cookie 已过期，需重新授权'
+            else if (status === 'expiring') meta = session?.reason || `即将过期${daysText ? ` · ${daysText}` : ''}`
+            else if (ok) meta = `已连接 · ${session.cookies} cookies · ${ago(session.updatedAt) || '已保存'}${daysText ? ` · ${daysText}` : ''}`
+            return `<div class="session-card" data-ok="${ok}" data-status="${status}">
                 <span class="session-card__dot" aria-hidden="true"></span>
                 <div>
                     <strong>${label}</strong>
@@ -968,8 +1052,8 @@ function renderJob(job) {
             if (!$('#dlg-login').open || state.jobEmail !== job.email || state.jobRunning) return
             const updated = state.accounts?.accounts?.find(a => a.email === job.email)
             if (updated) renderLoginSessionState(updated)
-            const hasMobile = Boolean(updated?.sessions?.mobile?.cookies)
-            const hasDesktop = Boolean(updated?.sessions?.desktop?.cookies)
+            const hasMobile = isSessionHealthy(updated?.sessions?.mobile)
+            const hasDesktop = isSessionHealthy(updated?.sessions?.desktop)
             if (job.state === 'done' && hasMobile && hasDesktop) {
                 setLoginFooter({
                     startVisible: false,
@@ -1279,6 +1363,42 @@ function bindEvents() {
         refreshAccounts()
         refreshRuns()
         runConsole.refresh(true)
+    })
+
+    $('#btn-check-sessions')?.addEventListener('click', async () => {
+        const btn = $('#btn-check-sessions')
+        if (!btn || btn.disabled) return
+        const label = $('span', btn)
+        btn.disabled = true
+        if (label) label.textContent = '检测中…'
+        try {
+            const res = await api('/api/sessions/check', { method: 'POST', body: { notify: true }, timeout: 35000 })
+            if (res.accounts) applyAccounts(res.accounts)
+            else await refreshAccounts()
+            const s = res.summary || {}
+            const notifyTail = res.notified ? '，已推送预警通知' : res.notifyError ? `（推送失败：${res.notifyError}）` : ''
+            if (s.invalid > 0) {
+                toast('error', `检测完成：发现 ${s.invalid} 处会话已失效${s.valid ? `（${s.valid} 处正常）` : ''}${notifyTail}`, 6000)
+            } else if (s.expiring > 0) {
+                toast('info', `检测完成：${s.valid} 处有效，${s.expiring} 处 Cookie 即将过期${notifyTail}`, 5200)
+            } else if (s.checked > 0) {
+                const extra = [
+                    s.skippedProxy ? `${s.skippedProxy} 处代理账号保留本地检查` : '',
+                    s.errors ? `${s.errors} 处网络超时未改状态` : ''
+                ].filter(Boolean).join('，')
+                toast('success', `检测完成：全部 ${s.valid} 处会话有效${extra ? `（${extra}）` : ''}`, 4500)
+            } else if (s.errors > 0) {
+                toast('error', `网络探测超时（${s.errors} 处），未改动会话状态`, 4500)
+            } else {
+                toast('info', '暂无可在线探测的已保存会话')
+            }
+        } catch (error) {
+            if (error.status === 401) return showUnlock('会话已过期，请重新输入访问密码')
+            toast('error', `检测会话失败：${error.message}`)
+        } finally {
+            btn.disabled = false
+            if (label) label.textContent = '检测会话'
+        }
     })
 
     $('#account-list').addEventListener('click', async event => {

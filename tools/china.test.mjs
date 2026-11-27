@@ -120,18 +120,78 @@ test('v5 upstream patcher injects QueryTopic adapters, parseDuration wait, and k
     const dir = scratch(t), panel = path.join(dir, 'panel.json')
     fs.mkdirSync(path.join(dir, 'dist/control-api'), { recursive: true })
     fs.mkdirSync(path.join(dir, 'dist/rewards/shared/query'), { recursive: true })
+    fs.mkdirSync(path.join(dir, 'dist/rewards/shared/http'), { recursive: true })
+    fs.mkdirSync(path.join(dir, 'dist/rewards/api/search'), { recursive: true })
     fs.mkdirSync(path.join(dir, 'dist/util'), { recursive: true })
     fs.writeFileSync(path.join(dir, 'dist/control-api/server.js'), 'async function requestHandler(req, res) {\n    return true\n}\n')
     const engineFile = path.join(dir, 'dist/rewards/shared/query/QueryEngine.js')
     const sourcesFile = path.join(dir, 'dist/rewards/shared/query/QuerySources.js')
     const utilsFile = path.join(dir, 'dist/util/Utils.js')
+    const bingClientFile = path.join(dir, 'dist/rewards/shared/http/BingClient.js')
+    const bingSearchApiFile = path.join(dir, 'dist/rewards/api/search/BingSearchApi.js')
     fs.writeFileSync(engineFile, 'exports.QueryEngine = class { constructor(bot) { this.bot = bot } async fetchTopics(options = {}) { return [{ text: "old" }] } };')
     fs.writeFileSync(sourcesFile, "exports.QuerySources = class { getLocalQueryList(language = 'en') { return [{ text: 'old' }] } };")
     fs.writeFileSync(utilsFile, 'exports.default = class { getSignal() { return undefined } parseDuration(v) { return Number(v) } async wait(time, signal = this.getSignal()) {} };')
+    fs.writeFileSync(bingClientFile, [
+        "const urls_1 = { URLs: { bing: { origin: 'https://www.bing.com' } } };",
+        'exports.BingClient = class {',
+        '    constructor(bot) { this.bot = bot }',
+        '    async request(config) {',
+        '        if (new URL(config.url).origin !== urls_1.URLs.bing.origin)',
+        "            throw new Error('Expected a Bing request URL');",
+        '        const response = await this.bot.sessionState.browserRequest(config);',
+        '        if (new URL(response.url).origin !== urls_1.URLs.bing.origin)',
+        "            throw new Error('Bing request left the authenticated Bing session');",
+        '        return response;',
+        '    }',
+        '};'
+    ].join('\n'))
+    fs.writeFileSync(bingSearchApiFile, [
+        "const urls_1 = { URLs: { bing: { origin: 'https://www.bing.com' } } };",
+        'exports.BingSearchApi = class {',
+        '    constructor(client) { this.client = client }',
+        '    async run(searchResponse, searchUrl, params) {',
+        '        const reportUrl = `${urls_1.URLs.bing.origin}/rewardsapp/reportActivity?${params.toString()}`;',
+        '        const reportResponse = await this.client.request({',
+        '            url: reportUrl,',
+        "            method: 'POST',",
+        '            headers: {',
+        "                Accept: '*/*',",
+        "                'Content-Type': 'application/x-www-form-urlencoded',",
+        '                Referer: searchUrl,',
+        '                Origin: urls_1.URLs.bing.origin,',
+        "                'X-Requested-With': 'XMLHttpRequest'",
+        '            },',
+        "            data: new URLSearchParams({ url: searchUrl, V: 'web' }).toString(),",
+        '        });',
+        '        return reportResponse;',
+        '    }',
+        '};'
+    ].join('\n'))
 
     const res = spawnSync(process.execPath, [fileURLToPath(new URL('../docker/prepare-upstream.mjs', import.meta.url)), dir], { encoding: 'utf8' })
     assert.equal(res.status, 0, res.stderr)
     assert.match(fs.readFileSync(path.join(dir, 'dist/control-api/server.js'), 'utf8'), /refreshAccountEnv\(projectRoot\)/)
+
+    // Patched BingClient & BingSearchApi allow cn.bing.com redirects while still rejecting login.live.com
+    const { BingClient } = await import(pathToFileURL(bingClientFile).href)
+    const { BingSearchApi } = await import(pathToFileURL(bingSearchApiFile).href)
+    const sentRequests = []
+    const client = new BingClient({
+        sessionState: {
+            async browserRequest(cfg) {
+                sentRequests.push(cfg)
+                if (cfg.url.includes('evil')) return { status: 200, url: 'https://login.live.com/login.srf' }
+                return { status: 200, url: cfg.url.replace('www.bing.com', 'cn.bing.com') }
+            }
+        }
+    })
+    const cnRes = await client.request({ url: 'https://www.bing.com/search?q=test' })
+    assert.equal(cnRes.url, 'https://cn.bing.com/search?q=test')
+    await assert.rejects(() => client.request({ url: 'https://www.bing.com/evil' }), /left the authenticated Bing session/)
+    await new BingSearchApi(client).run(cnRes, 'https://www.bing.com/search?q=test', new URLSearchParams({ IG: 'ABC' }))
+    assert.match(sentRequests.at(-1).url, /^https:\/\/cn\.bing\.com\/rewardsapp\/reportActivity\?/)
+    assert.equal(sentRequests.at(-1).headers.Origin, 'https://cn.bing.com')
 
     const prevMode = process.env.PANEL_QUERY_MODE
     try {

@@ -3,9 +3,12 @@ import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { DatabaseSync } from 'node:sqlite'
 import { LOCK_FILE, lowMemoryConfig, migrateConfigToTemplate, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
 import { ActivityStore, activityFile } from '../lib/activity-store.mjs'
 import { readSchedule, scheduleDate, scheduleMarkerFile } from '../lib/task-settings.mjs'
+import { inspectCookieHealth, readSessionHealthMap } from '../lib/session-health.mjs'
+import { notifySessionAlerts } from '../lib/notifications.mjs'
 
 process.umask(0o077)
 if (['1', 'true', 'yes', 'on'].includes(String(process.env.PANEL_NO_AUTH).toLowerCase())) throw new Error('Docker 远程授权要求启用面板访问密码')
@@ -99,11 +102,47 @@ try {
     if (!stopping) children.push(start(process.execPath, [path.join(panelRoot, 'server.js')], { cwd: panelRoot, env }))
     {
         let scheduling = false
+        let lastSessionCheckDay = ''
         const marker = scheduleMarkerFile(panelFile)
+        const checkLocalSessionExpiry = async () => {
+            const today = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.TZ || 'Asia/Shanghai' }).format(Date.now())
+            if (today === lastSessionCheckDay) return
+            lastSessionCheckDay = today
+            try {
+                const dbPath = path.join(data, 'sessions', 'sessions.db')
+                if (!fs.existsSync(dbPath)) return
+                const activeEmails = new Set(
+                    (fs.existsSync(accountFile) ? fs.readFileSync(accountFile, 'utf8') : '')
+                        .split(/\r?\n/)
+                        .map(line => /^\s*ACCOUNT_\d+_EMAIL\s*=\s*(.+)$/.exec(line)?.[1]?.trim().replace(/^['"]|['"]$/g, '').toLowerCase())
+                        .filter(Boolean)
+                )
+                const overlays = readSessionHealthMap(panelFile)
+                const sdb = new DatabaseSync(dbPath, { readOnly: true })
+                const alerts = []
+                try {
+                    for (const row of sdb.prepare('SELECT email, platform, storage_state, updated_at FROM sessions').all()) {
+                        const key = String(row.email || '').toLowerCase()
+                        if (activeEmails.size && !activeEmails.has(key)) continue
+                        const overlay = overlays[key]?.[row.platform] || null
+                        const health = inspectCookieHealth(row.storage_state, { updatedAt: Number(row.updated_at) || null, overlay })
+                        if (['invalid', 'expired', 'expiring'].includes(health.status)) {
+                            alerts.push({ email: row.email, platform: row.platform, status: health.status, daysLeft: health.daysLeft, reason: health.reason })
+                        }
+                    }
+                } finally { sdb.close() }
+                if (alerts.length) {
+                    const res = await notifySessionAlerts(panelFile, alerts, { source: 'schedule' })
+                    if (res?.sent) console.log(`[session-health] sent ${res.count} cookie expiry alert(s)`)
+                }
+            } catch (error) { console.error(`[session-health] ${error.message}`) }
+        }
+        void checkLocalSessionExpiry()
         scheduleTimer = setInterval(async () => {
             if (stopping || scheduling) return
             scheduling = true
             try {
+                await checkLocalSessionExpiry()
                 const schedule = readSchedule(panelFile)
                 const date = scheduleDate(schedule, Date.now(), fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8').trim() : '')
                 if (!date) return

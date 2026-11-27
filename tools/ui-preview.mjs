@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WORKERS, nextSchedule } from '../lib/task-settings.mjs'
-import { formatRunNotification, samplePreviewRun } from '../lib/notifications.mjs'
+import { formatRunNotification, formatSessionAlertNotification, samplePreviewRun, sampleSessionAlerts } from '../lib/notifications.mjs'
 
 const root = fileURLToPath(new URL('../public/', import.meta.url))
 const port = Number(process.env.PREVIEW_PORT || 4192)
@@ -68,8 +68,13 @@ const server = http.createServer(async (req, res) => {
             }
             return json(settings)
         }
-        if (url.pathname === '/api/notifications') return json({ enabled: true, supported: true, autoSupported: true, hasToken: true, provider: 'pushplus', server: '', last: { at: now - 120000, state: 'sent' } })
-        if (url.pathname === '/api/notifications/preview') return json(formatRunNotification(url.searchParams.get('provider') || 'pushplus', samplePreviewRun(url.searchParams.get('state') || 'completed')))
+        if (url.pathname === '/api/sessions/check') return json({ ok: true, checkedAt: Date.now(), results: [], summary: { checked: 3, valid: 3, invalid: 0, expiring: 0, errors: 0, skippedProxy: 0 }, alerts: [], notified: false, accounts: { ok: true, accounts, sessionAlerts: [], envExists: true, nextIndex: 3 } })
+        if (url.pathname === '/api/notifications') return json({ enabled: true, supported: true, autoSupported: true, sessionAlerts: true, hasToken: true, provider: 'pushplus', server: '', last: { at: now - 120000, state: 'sent' } })
+        if (url.pathname === '/api/notifications/preview') {
+            const p = url.searchParams.get('provider') || 'pushplus'
+            const st = url.searchParams.get('state') || 'completed'
+            return json(st === 'session_alert' ? formatSessionAlertNotification(p, sampleSessionAlerts(), { source: 'check' }) : formatRunNotification(p, samplePreviewRun(st)))
+        }
         if (url.pathname === '/api/notifications/test') return json({ ok: true, sent: true, provider: 'pushplus', view: { enabled: true, supported: true, hasToken: true, provider: 'pushplus', last: { at: Date.now(), state: 'sent', test: true } } })
         if (req.headers.accept?.includes('text/event-stream')) { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); return res.write(': preview\n\n') }
         return json({ ok: true })

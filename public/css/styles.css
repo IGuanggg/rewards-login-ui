@@ -424,6 +424,7 @@ select:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .tag--ok { background: var(--success-soft); color: var(--success); }
 .tag--warn { background: var(--warning-soft); color: var(--warning); }
+.tag--danger { background: var(--danger-soft); color: var(--danger); }
 .tag--accent { background: var(--accent-soft); color: var(--accent-fg); }
 .tag--muted { background: var(--well); color: var(--fg-muted); }
 
@@ -1060,13 +1061,30 @@ select:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
     border-color: var(--success-border);
     background: var(--success-soft);
 }
+.session-tile[data-status="expiring"] {
+    border-style: solid;
+    border-color: var(--warning-border);
+    background: var(--warning-soft);
+}
+.session-tile[data-status="invalid"],
+.session-tile[data-status="expired"] {
+    border-style: solid;
+    border-color: var(--danger-border);
+    background: var(--danger-soft);
+}
 
 .session-tile__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-faint); opacity: 0.5; flex: none; }
 .session-tile[data-ok="true"] .session-tile__dot { background: var(--success-dot); opacity: 1; }
+.session-tile[data-status="expiring"] .session-tile__dot { background: var(--warning-dot); opacity: 1; }
+.session-tile[data-status="invalid"] .session-tile__dot,
+.session-tile[data-status="expired"] .session-tile__dot { background: var(--danger-dot); opacity: 1; }
 .session-tile__body { min-width: 0; display: grid; gap: 1px; }
 .session-tile__body strong { font-size: 12px; font-weight: 600; line-height: 1.25; }
 .session-tile__body span { font-size: 11px; color: var(--fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-tile[data-ok="true"] .session-tile__body span { color: var(--success); }
+.session-tile[data-status="expiring"] .session-tile__body span { color: var(--warning); }
+.session-tile[data-status="invalid"] .session-tile__body span,
+.session-tile[data-status="expired"] .session-tile__body span { color: var(--danger); }
 
 .account-item__actions {
     display: flex;
@@ -1136,6 +1154,11 @@ select:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
 .run-banner__body strong { font-size: 13.5px; font-weight: 600; color: var(--fg); }
 .run-banner__body p { margin: 0; font-size: 12.5px; color: var(--fg-muted); }
 .run-banner__actions { display: flex; align-items: center; gap: 8px; }
+
+.run-banner[data-tone="danger"] { border-color: var(--danger-border); background: var(--danger-soft); }
+.run-banner[data-tone="danger"] .run-banner__dot { background: var(--danger-dot); box-shadow: 0 0 0 4px var(--danger-soft); }
+.run-banner[data-tone="warn"] { border-color: var(--warning-border); background: var(--warning-soft); }
+.run-banner[data-tone="warn"] .run-banner__dot { background: var(--warning-dot); box-shadow: 0 0 0 4px var(--warning-soft); }
 
 .login-busy {
     display: flex;
@@ -1429,11 +1452,20 @@ dialog.dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(12p
 .session-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .session-card { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--well); }
 .session-card[data-ok="true"] { border-color: var(--success-border); background: var(--success-soft); }
+.session-card[data-status="expiring"] { border-color: var(--warning-border); background: var(--warning-soft); }
+.session-card[data-status="invalid"],
+.session-card[data-status="expired"] { border-color: var(--danger-border); background: var(--danger-soft); }
 .session-card__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-faint); opacity: 0.5; flex: none; }
 .session-card[data-ok="true"] .session-card__dot { background: var(--success-dot); opacity: 1; }
+.session-card[data-status="expiring"] .session-card__dot { background: var(--warning-dot); opacity: 1; }
+.session-card[data-status="invalid"] .session-card__dot,
+.session-card[data-status="expired"] .session-card__dot { background: var(--danger-dot); opacity: 1; }
 .session-card strong { display: block; font-size: 12.5px; font-weight: 600; }
 .session-card span { display: block; font-size: 11.5px; color: var(--fg-muted); }
 .session-card[data-ok="true"] span { color: var(--success); }
+.session-card[data-status="expiring"] span { color: var(--warning); }
+.session-card[data-status="invalid"] span,
+.session-card[data-status="expired"] span { color: var(--danger); }
 
 .platform-section { display: grid; gap: 8px; }
 .radio-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }

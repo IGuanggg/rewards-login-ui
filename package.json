@@ -14,7 +14,7 @@
         "test:docker": "node --test tools/docker.test.mjs",
         "test:activity": "node --test tools/activity.test.mjs tools/activity-api.test.mjs",
         "test:run": "node --test tools/run-console.test.mjs tools/run-api.test.mjs",
-        "test:china": "node --test tools/china.test.mjs tools/notifications.test.mjs",
+        "test:china": "node --test tools/china.test.mjs tools/notifications.test.mjs tools/session-health.test.mjs",
         "shots": "node tools/ui-shots.mjs"
     }
 }

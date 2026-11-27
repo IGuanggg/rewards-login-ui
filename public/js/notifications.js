@@ -37,6 +37,34 @@ function renderPreviewStage(stage, payload) {
         return
     }
     const s = payload.summary || {}
+    if (Array.isArray(s.items)) {
+        const rows = s.items.map(item => `
+            <tr>
+                <td>${item.index}</td>
+                <td class="mono">${esc(item.label)}</td>
+                <td>${esc(item.platformText)}</td>
+                <td><span class="tag ${item.urgent ? 'tag--danger' : 'tag--warn'}">${esc(item.statusText)}</span></td>
+                <td>${esc(item.reason)}</td>
+            </tr>`).join('')
+        stage.innerHTML = `
+            <div class="notify-md">
+                <div class="notify-md__title">${esc(payload.title)}</div>
+                <blockquote class="notify-md__quote" style="border-left-color:${esc(s.meta?.accent || '#dc2626')}">
+                    <strong>${esc(s.meta?.label || '')}</strong> · <code>${esc(s.day || '')}</code> · ${esc(s.sourceText || '')}
+                </blockquote>
+                <div class="activity-table-wrap">
+                    <table class="activity-table notify-md__table">
+                        <thead><tr><th>#</th><th>账号</th><th>平台</th><th>状态</th><th>说明</th></tr></thead>
+                        <tbody>${rows || '<tr><td colspan="5" class="activity-table-empty">暂无异常</td></tr>'}</tbody>
+                    </table>
+                </div>
+                <details class="notify-md__raw">
+                    <summary>查看发送的 Markdown 原文</summary>
+                    <pre>${esc(payload.content || '')}</pre>
+                </details>
+            </div>`
+        return
+    }
     const rows = (s.accounts || []).map(acc => `
         <tr>
             <td>${acc.index}</td>
@@ -143,6 +171,7 @@ export function createNotifications({ api, onUnauthorized }) {
         $('#notification-enabled').checked = Boolean(data.enabled)
         $('#notification-provider').value = data.provider || 'pushplus'
         $('#notification-onlyProblems').checked = Boolean(data.onlyProblems)
+        if ($('#notification-sessionAlerts')) $('#notification-sessionAlerts').checked = data.sessionAlerts !== false
         $('#notification-token').value = ''
         $('#notification-server').value = data.server || ''
         $('#notification-clear').checked = false
@@ -238,6 +267,7 @@ export function createNotifications({ api, onUnauthorized }) {
                     enabled: $('#notification-enabled').checked,
                     provider,
                     onlyProblems: $('#notification-onlyProblems').checked,
+                    sessionAlerts: Boolean($('#notification-sessionAlerts')?.checked ?? true),
                     token: $('#notification-token').value,
                     server,
                     clearToken: $('#notification-clear').checked,

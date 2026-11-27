@@ -67,6 +67,17 @@ test('last result survives reload and failed login offers the affected account',
     })
     assert.equal(view.action, 'login')
     assert.equal(view.email, 'third@example.invalid')
+    view = runView({
+        ...ready(),
+        latest: {
+            run: {
+                id: 'cn1', state: 'partial', startedAt: Date.now() - 10000, endedAt: Date.now(), points: 75,
+                accounts: [{ email: 'first@example.invalid', error: 'Search: Bing request left the authenticated Bing session' }]
+            },
+            tasks: []
+        }
+    })
+    assert.equal(view.action, 'logs', 'cn.bing.com search redirect error should not mislead user into re-login')
 })
 
 test('UI immediately disables duplicate starts and calls the actual stop endpoint', async t => {

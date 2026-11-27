@@ -62,6 +62,62 @@ if (fs.existsSync(v5Server)) {
     fs.writeFileSync(querySourcesFile, querySources.replace(localAnchor, localAnchor + localInject))
     fs.writeFileSync(utilsFile, utils.replace(waitAnchor, waitAnchor + waitInject))
 
+    // 国内网络访问 www.bing.com 会 302 到 cn.bing.com，允许纯接口模式在 cn.bing.com 上继续完成搜索与上报
+    const bingClientFile = path.join(root, 'dist/rewards/shared/http/BingClient.js')
+    if (fs.existsSync(bingClientFile)) {
+        const bingClient = fs.readFileSync(bingClientFile, 'utf8')
+        const reqOriginAnchor = 'if (new URL(config.url).origin !== urls_1.URLs.bing.origin)'
+        const resOriginAnchor = 'if (new URL(response.url).origin !== urls_1.URLs.bing.origin)'
+        if (bingClient.split(reqOriginAnchor).length !== 2 || bingClient.split(resOriginAnchor).length !== 2) {
+            throw new Error('Upstream v5 BingClient changed; review cn.bing.com adapter')
+        }
+        fs.writeFileSync(
+            bingClientFile,
+            bingClient
+                .replace(reqOriginAnchor, "if (![urls_1.URLs.bing.origin, 'https://cn.bing.com'].includes(new URL(config.url).origin))")
+                .replace(resOriginAnchor, "if (![urls_1.URLs.bing.origin, 'https://cn.bing.com'].includes(new URL(response.url).origin))")
+        )
+    }
+
+    const bingSearchApiFile = path.join(root, 'dist/rewards/api/search/BingSearchApi.js')
+    if (fs.existsSync(bingSearchApiFile)) {
+        const bingSearchApi = fs.readFileSync(bingSearchApiFile, 'utf8').replace(/\r\n/g, '\n')
+        const reportAnchor = [
+            '        const reportUrl = `${urls_1.URLs.bing.origin}/rewardsapp/reportActivity?${params.toString()}`;',
+            '        const reportResponse = await this.client.request({',
+            '            url: reportUrl,',
+            "            method: 'POST',",
+            '            headers: {',
+            "                Accept: '*/*',",
+            "                'Content-Type': 'application/x-www-form-urlencoded',",
+            '                Referer: searchUrl,',
+            '                Origin: urls_1.URLs.bing.origin,',
+            "                'X-Requested-With': 'XMLHttpRequest'",
+            '            },',
+            "            data: new URLSearchParams({ url: searchUrl, V: 'web' }).toString(),"
+        ].join('\n')
+        if (bingSearchApi.split(reportAnchor).length !== 2) {
+            throw new Error('Upstream v5 BingSearchApi changed; review cn.bing.com reportActivity adapter')
+        }
+        const reportReplacement = [
+            '        const activeBingOrigin = searchResponse.url ? new URL(searchResponse.url).origin : urls_1.URLs.bing.origin;',
+            '        const effectiveSearchUrl = searchResponse.url || searchUrl;',
+            '        const reportUrl = `${activeBingOrigin}/rewardsapp/reportActivity?${params.toString()}`;',
+            '        const reportResponse = await this.client.request({',
+            '            url: reportUrl,',
+            "            method: 'POST',",
+            '            headers: {',
+            "                Accept: '*/*',",
+            "                'Content-Type': 'application/x-www-form-urlencoded',",
+            '                Referer: effectiveSearchUrl,',
+            '                Origin: activeBingOrigin,',
+            "                'X-Requested-With': 'XMLHttpRequest'",
+            '            },',
+            "            data: new URLSearchParams({ url: effectiveSearchUrl, V: 'web' }).toString(),"
+        ].join('\n')
+        fs.writeFileSync(bingSearchApiFile, bingSearchApi.replace(reportAnchor, reportReplacement))
+    }
+
     fs.copyFileSync(envHelperSource, path.join(root, 'dist/control-api/panel-accounts-env.mjs'))
     fs.writeFileSync(
         v5Server,

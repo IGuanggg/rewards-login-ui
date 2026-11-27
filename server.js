@@ -23,7 +23,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { createDesktopProxy } from './lib/desktop-proxy.mjs'
 import { ActivityStore, activityFile, redactLog } from './lib/activity-store.mjs'
 import { readTaskSettings, writeTaskSettings, readSchedule } from './lib/task-settings.mjs'
-import { notificationView, saveNotifications, sendTestNotification, formatRunNotification, samplePreviewRun } from './lib/notifications.mjs'
+import { notificationView, saveNotifications, sendTestNotification, formatRunNotification, formatSessionAlertNotification, samplePreviewRun, sampleSessionAlerts, notifySessionAlerts } from './lib/notifications.mjs'
+import { inspectCookieHealth, readSessionHealthMap, recordSessionHealth, clearSessionHealth, probeBingSession, collectSessionAlerts } from './lib/session-health.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, 'public')
@@ -387,43 +388,41 @@ function resolveSessionDb(botDir) {
 
 /* ────────────────────────── 会话读取（只读） ────────────────────────── */
 
-function inspectStorage(raw) {
-    if (raw == null || raw === '') return { ok: false, cookies: 0, reason: '会话内容为空' }
-    let parsed
-    try {
-        parsed = JSON.parse(raw)
-    } catch {
-        return { ok: false, cookies: 0, reason: '会话内容无法解析' }
-    }
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.cookies)) {
-        return { ok: false, cookies: 0, reason: '会话结构不完整' }
-    }
-    const usable = parsed.cookies.filter(cookie => cookie && typeof cookie.name === 'string' && cookie.name && typeof cookie.value === 'string' && cookie.value)
-    if (!usable.length) return { ok: false, cookies: 0, reason: '没有可用 Cookie' }
-    return { ok: true, cookies: usable.length, reason: null }
-}
-
-function readSessionRows(botDir) {
+function readSessionRows(botDir, { includeRaw = false } = {}) {
     const db = resolveSessionDb(botDir)
     if (!db.path) {
         return { ...db, exists: false, rows: [], error: db.configInvalid ? 'config.json 无法解析' : null }
     }
+    const overlays = readSessionHealthMap(CONFIG_FILE)
     let handle
     try {
         handle = new DatabaseSync(db.path, { readOnly: true })
         handle.exec('PRAGMA busy_timeout = 2000')
+        const cols = new Set(handle.prepare('PRAGMA table_info(sessions)').all().map(col => col.name))
+        const selectSql = cols.has('fingerprint')
+            ? 'SELECT email, platform, storage_state, fingerprint, updated_at FROM sessions'
+            : 'SELECT email, platform, storage_state, updated_at FROM sessions'
         const rows = handle
-            .prepare('SELECT email, platform, storage_state, updated_at FROM sessions')
+            .prepare(selectSql)
             .all()
             .map(row => {
-                const storage = inspectStorage(row.storage_state)
+                const updatedAt = Number(row.updated_at) || null
+                const overlay = overlays[String(row.email || '').toLowerCase()]?.[row.platform] || null
+                const health = inspectCookieHealth(row.storage_state, { updatedAt, overlay })
                 return {
                     email: row.email,
                     platform: row.platform,
-                    updatedAt: Number(row.updated_at) || null,
-                    cookies: storage.cookies,
-                    usable: storage.ok,
-                    reason: storage.reason
+                    updatedAt,
+                    cookies: health.cookies,
+                    usable: health.ok,
+                    status: health.status,
+                    reason: health.reason,
+                    expiresAt: health.expiresAt,
+                    daysLeft: health.daysLeft,
+                    checkedAt: health.checkedAt,
+                    checkSource: health.checkSource,
+                    probedBalance: health.probedBalance,
+                    ...(includeRaw ? { storageState: row.storage_state, fingerprint: row.fingerprint ?? null } : {})
                 }
             })
         return { ...db, exists: true, rows, error: null }
@@ -441,7 +440,17 @@ function sessionMap(botDir, email) {
     const map = {}
     for (const row of result.rows) {
         if (row.email.toLowerCase() !== String(email).toLowerCase()) continue
-        map[row.platform] = { updatedAt: row.updatedAt, cookies: row.cookies, usable: row.usable, reason: row.reason }
+        map[row.platform] = {
+            updatedAt: row.updatedAt,
+            cookies: row.cookies,
+            usable: row.usable,
+            status: row.status,
+            reason: row.reason,
+            expiresAt: row.expiresAt,
+            daysLeft: row.daysLeft,
+            checkedAt: row.checkedAt,
+            checkSource: row.checkSource
+        }
     }
     return { map, db: result }
 }
@@ -943,8 +952,32 @@ function buildAccountsPayload(botDir) {
                 passwordMasked: mask(account.values.PASSWORD),
                 totpMasked: mask(account.values.TOTP_SECRET),
                 sessions: {
-                    mobile: record.mobile ? { updatedAt: record.mobile.updatedAt, cookies: record.mobile.cookies } : null,
-                    desktop: record.desktop ? { updatedAt: record.desktop.updatedAt, cookies: record.desktop.cookies } : null
+                    mobile: record.mobile
+                        ? {
+                              updatedAt: record.mobile.updatedAt,
+                              cookies: record.mobile.cookies,
+                              status: record.mobile.status,
+                              reason: record.mobile.reason,
+                              expiresAt: record.mobile.expiresAt,
+                              daysLeft: record.mobile.daysLeft,
+                              checkedAt: record.mobile.checkedAt,
+                              checkSource: record.mobile.checkSource,
+                              probedBalance: record.mobile.probedBalance
+                          }
+                        : null,
+                    desktop: record.desktop
+                        ? {
+                              updatedAt: record.desktop.updatedAt,
+                              cookies: record.desktop.cookies,
+                              status: record.desktop.status,
+                              reason: record.desktop.reason,
+                              expiresAt: record.desktop.expiresAt,
+                              daysLeft: record.desktop.daysLeft,
+                              checkedAt: record.desktop.checkedAt,
+                              checkSource: record.desktop.checkSource,
+                              probedBalance: record.desktop.probedBalance
+                          }
+                        : null
                 }
             }
         })
@@ -955,6 +988,7 @@ function buildAccountsPayload(botDir) {
         envExists: fs.existsSync(envPath),
         envPath,
         accounts,
+        sessionAlerts: collectSessionAlerts(accounts),
         nextIndex: accounts.length ? Math.max(...accounts.map(a => a.index)) + 1 : 1,
         sessions: {
             exists: sessions.exists,
@@ -1172,6 +1206,7 @@ function startManualLogin({ botDir, email, platform, fresh }) {
         job.verification = verifySessions(botDir, job)
         const joined = job.log.map(line => line.text).join('\n')
         const { saved, missing } = job.verification
+        if (saved.length) clearSessionHealth(CONFIG_FILE, email, saved)
         const exitedCleanly = code === 0 && !signal
 
         const platformLabel = list => list.map(p => (p === 'mobile' ? '移动端' : p === 'desktop' ? '桌面端' : p)).join('、')
@@ -1326,19 +1361,33 @@ function runReadiness(accountIndex) {
     if (!check.runReady) return { ready: false, action: 'settings', error: `签到环境未就绪：${[...new Set([...check.blocking, ...check.runBlocking])].join('、')}。请到环境与设置查看检查结果。`, accounts: accounts.length }
     const need = requiredSessionPlatforms(dir)
     const loginRequired = []
+    const isSessionUsable = session => Boolean(session?.cookies > 0 && !['invalid', 'expired'].includes(session.status))
     for (const account of selected) {
         if (account.hasPassword) continue
         const missingPlatforms = []
-        if (need.mobile && !(account.sessions.mobile?.cookies > 0)) missingPlatforms.push('手机端')
-        if (need.desktop && !(account.sessions.desktop?.cookies > 0)) missingPlatforms.push('电脑端')
-        if (missingPlatforms.length) loginRequired.push({ index: account.index, email: account.email, missingPlatforms })
+        const invalidPlatforms = []
+        if (need.mobile && !isSessionUsable(account.sessions.mobile)) {
+            if (['invalid', 'expired'].includes(account.sessions.mobile?.status)) invalidPlatforms.push('手机端')
+            else missingPlatforms.push('手机端')
+        }
+        if (need.desktop && !isSessionUsable(account.sessions.desktop)) {
+            if (['invalid', 'expired'].includes(account.sessions.desktop?.status)) invalidPlatforms.push('电脑端')
+            else missingPlatforms.push('电脑端')
+        }
+        const affected = [...invalidPlatforms, ...missingPlatforms]
+        if (affected.length) loginRequired.push({ index: account.index, email: account.email, missingPlatforms: affected, invalidPlatforms })
     }
     const first = loginRequired[0]
+    const firstDesc = first
+        ? first.invalidPlatforms.length && !first.missingPlatforms.some(p => !first.invalidPlatforms.includes(p))
+            ? `${first.invalidPlatforms.join('、')}会话已失效`
+            : `缺少或失效（${first.missingPlatforms.join('、')}）`
+        : ''
     const error = !loginRequired.length
         ? null
         : loginRequired.length === 1
-          ? `账号 ${first.email} 未保存密码且缺少${first.missingPlatforms.join('、')}会话，请先补全登录再运行签到。`
-          : `有 ${loginRequired.length} 个无密码账号会话不完整（如 ${first.email} 缺少${first.missingPlatforms.join('、')}），请先补全登录再运行签到。`
+          ? `账号 ${first.email} 未保存密码且${firstDesc}，请先重新登录再运行签到。`
+          : `有 ${loginRequired.length} 个无密码账号会话不完整或已失效（如 ${first.email}），请先补全或重新登录再运行签到。`
     return { ready: !loginRequired.length, action: 'login', accounts: accounts.length, loginRequired, error }
 }
 
@@ -1668,6 +1717,7 @@ const server = http.createServer(async (req, res) => {
                 running.child.kill()
             }
             jobs.delete(key)
+            clearSessionHealth(CONFIG_FILE, email)
 
             deleteAccount(envPath, index)
             log('删除账号', `ACCOUNT_${index}`, email)
@@ -1722,30 +1772,120 @@ const server = http.createServer(async (req, res) => {
             return json(res, 200, { ok: true })
         }
 
+        if (pathname === '/api/sessions/check' && req.method === 'POST') {
+            const body = await readBody(req)
+            const dir = currentBotDir()
+            if (!dir) throw Object.assign(new Error('尚未连接有效实例'), { status: 422 })
+            const targetEmail = typeof body.email === 'string' && body.email.trim() ? body.email.trim().toLowerCase() : null
+            const notify = body.notify === true
+            const payloadBefore = buildAccountsPayload(dir)
+            const targets = targetEmail
+                ? (payloadBefore.accounts || []).filter(account => account.email.toLowerCase() === targetEmail)
+                : payloadBefore.accounts || []
+            if (targetEmail && !targets.length) return json(res, 404, { error: '账号不存在' })
+
+            const rawSessions = readSessionRows(dir, { includeRaw: true })
+            const rawByKey = new Map(rawSessions.rows.map(row => [`${row.email.toLowerCase()}|${row.platform}`, row]))
+            const updates = []
+            const results = []
+            let validCount = 0, invalidCount = 0, errorCount = 0, skippedProxy = 0
+
+            for (const account of targets) {
+                for (const platform of ['mobile', 'desktop']) {
+                    const row = rawByKey.get(`${account.email.toLowerCase()}|${platform}`)
+                    if (!row || !row.usable) {
+                        results.push({ email: account.email, platform, status: 'missing', reason: '尚未登录' })
+                        continue
+                    }
+                    if (account.hasProxy) {
+                        skippedProxy++
+                        results.push({ email: account.email, platform, status: row.status, skippedProxy: true, reason: '该账号配置了自定义代理，已保留本地有效期检查' })
+                        continue
+                    }
+                    const probed = await probeBingSession({ storageState: row.storageState, fingerprint: row.fingerprint, platform })
+                    if (probed.status === 'valid' || probed.status === 'invalid') {
+                        updates.push({
+                            email: account.email,
+                            platform,
+                            status: probed.status,
+                            reason: probed.reason,
+                            sessionUpdatedAt: row.updatedAt,
+                            checkedAt: Date.now(),
+                            source: 'probe',
+                            balance: probed.balance
+                        })
+                        if (probed.status === 'valid') validCount++
+                        else invalidCount++
+                    } else {
+                        errorCount++
+                    }
+                    results.push({ email: account.email, platform, ...probed })
+                    await new Promise(resolve => setTimeout(resolve, 250))
+                }
+            }
+
+            if (updates.length) recordSessionHealth(CONFIG_FILE, updates)
+            const accountsPayload = buildAccountsPayload(dir)
+            const alerts = collectSessionAlerts(accountsPayload.accounts || [])
+            const expiringCount = alerts.filter(item => item.status === 'expiring').length
+            let notified = false, notifyError = null
+            if (notify && alerts.length) {
+                try {
+                    const sent = await notifySessionAlerts(CONFIG_FILE, alerts, { force: true, source: 'check' })
+                    notified = Boolean(sent?.sent)
+                } catch (err) {
+                    notifyError = err?.message || '预警通知发送失败'
+                }
+            }
+            return json(res, 200, {
+                ok: true,
+                checkedAt: Date.now(),
+                results,
+                summary: { checked: validCount + invalidCount, valid: validCount, invalid: invalidCount, expiring: expiringCount, errors: errorCount, skippedProxy },
+                alerts,
+                notified,
+                notifyError,
+                accounts: accountsPayload
+            })
+        }
+
         /* ── 持久化签到记录 ── */
         if (pathname === '/api/dashboard' && req.method === 'GET') {
             const history = activity().overview()
-            const accounts = buildAccountsPayload(currentBotDir()).accounts || []
+            const accountsPayload = buildAccountsPayload(currentBotDir())
+            const accounts = accountsPayload.accounts || []
             let config = {}, upstreamVersion = null
             try { config = readTaskSettings(currentBotDir(), CONFIG_FILE); upstreamVersion = JSON.parse(fs.readFileSync(path.join(currentBotDir(), 'package.json'), 'utf8')).version || null } catch {}
             const known = new Map(history.accounts.map(account => [account.email.toLowerCase(), account]))
             const current = accounts.map(account => {
-                const mobileSaved = Boolean(account.sessions.mobile?.cookies)
-                const desktopSaved = Boolean(account.sessions.desktop?.cookies)
+                const mobileStatus = account.sessions.mobile?.status || 'missing'
+                const desktopStatus = account.sessions.desktop?.status || 'missing'
+                const mobileSaved = Boolean(account.sessions.mobile?.cookies > 0 && !['invalid', 'expired'].includes(mobileStatus))
+                const desktopSaved = Boolean(account.sessions.desktop?.cookies > 0 && !['invalid', 'expired'].includes(desktopStatus))
+                const sessionInvalid = ['invalid', 'expired'].includes(mobileStatus) || ['invalid', 'expired'].includes(desktopStatus)
+                const sessionExpiring = !sessionInvalid && (mobileStatus === 'expiring' || desktopStatus === 'expiring')
+                const probedBalance = account.sessions.desktop?.probedBalance ?? account.sessions.mobile?.probedBalance ?? null
+                const hist = known.get(account.email.toLowerCase())
                 return {
                     email: account.email,
                     mobileSaved,
                     desktopSaved,
+                    mobileStatus,
+                    desktopStatus,
+                    mobileDaysLeft: account.sessions.mobile?.daysLeft ?? null,
+                    desktopDaysLeft: account.sessions.desktop?.daysLeft ?? null,
+                    sessionInvalid,
+                    sessionExpiring,
                     savedSession: mobileSaved && desktopSaved,
                     partialSession: (mobileSaved || desktopSaved) && !(mobileSaved && desktopSaved),
-                    todayPoints: known.get(account.email.toLowerCase())?.todayPoints ?? null,
-                    balance: known.get(account.email.toLowerCase())?.balance ?? null,
-                    balanceAt: known.get(account.email.toLowerCase())?.balanceAt ?? null
+                    todayPoints: hist?.todayPoints ?? null,
+                    balance: hist?.balance ?? probedBalance,
+                    balanceAt: hist?.balanceAt ?? account.sessions.desktop?.checkedAt ?? account.sessions.mobile?.checkedAt ?? null
                 }
             })
             let scheduleState = null
             try { scheduleState = JSON.parse(fs.readFileSync(path.join(path.dirname(CONFIG_FILE), 'schedule-state.json'), 'utf8')) } catch {}
-            return json(res, 200, { ...history, accounts: current, schedule: { ...readSchedule(CONFIG_FILE), supported: REMOTE_DESKTOP, last: scheduleState },
+            return json(res, 200, { ...history, accounts: current, sessionAlerts: accountsPayload.sessionAlerts || [], schedule: { ...readSchedule(CONFIG_FILE), supported: REMOTE_DESKTOP, last: scheduleState },
                 queryMode: config.queryMode || 'existing', chinaSupported: config.chinaSupported || false,
                 rewardsMode: config.rewardsMode || 'browser', ensureStreakProtection: config.ensureStreakProtection ?? null,
                 v5Supported: config.v5Supported || false, panelVersion: '2.2.0', upstreamVersion })
@@ -1760,6 +1900,9 @@ const server = http.createServer(async (req, res) => {
             const provider = url.searchParams.get('provider') || notificationView(CONFIG_FILE).provider || 'pushplus'
             if (!['pushplus', 'serverchan', 'bark'].includes(provider)) return json(res, 422, { error: '不支持的通知渠道' })
             const sampleState = url.searchParams.get('state') || 'completed'
+            if (sampleState === 'session_alert') {
+                return json(res, 200, formatSessionAlertNotification(provider, sampleSessionAlerts(), { source: 'check' }))
+            }
             return json(res, 200, formatRunNotification(provider, samplePreviewRun(sampleState)))
         }
         if (pathname === '/api/notifications/test' && req.method === 'POST') {

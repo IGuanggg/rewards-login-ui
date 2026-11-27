@@ -321,6 +321,10 @@
                                     <p class="page-head__meta" id="accounts-hint">读取中…</p>
                                 </div>
                                 <div class="page-head__actions">
+                                    <button class="ghost-btn ghost-btn--bordered" id="btn-check-sessions" type="button" title="轻量 HTTP 探测已保存会话是否有效，不启动浏览器">
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 5 6v6c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9V6l-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12.2 2 2 4-4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        <span>检测会话</span>
+                                    </button>
                                     <button class="ghost-btn ghost-btn--bordered" id="btn-refresh" type="button">
                                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                         刷新
@@ -340,6 +344,17 @@
                                 <div class="run-banner__actions">
                                     <button class="mini-btn" id="btn-accounts-view-run" type="button">查看进度</button>
                                     <button class="mini-btn mini-btn--danger-solid" id="btn-accounts-stop-run" type="button">停止运行</button>
+                                </div>
+                            </section>
+
+                            <section class="run-banner" id="accounts-session-alert" role="alert" data-tone="danger" hidden>
+                                <span class="run-banner__dot" aria-hidden="true"></span>
+                                <div class="run-banner__body">
+                                    <strong id="accounts-session-alert-title">检测到会话（CK）异常</strong>
+                                    <p id="accounts-session-alert-desc">—</p>
+                                </div>
+                                <div class="run-banner__actions">
+                                    <button class="mini-btn mini-btn--primary" id="btn-accounts-fix-session" type="button">去重新登录</button>
                                 </div>
                             </section>
 
@@ -701,6 +716,7 @@
                                             </label>
                                             <div class="check-stack">
                                                 <label class="check-row"><input type="checkbox" id="notification-onlyProblems" /><span>仅在失败或部分完成时推送</span></label>
+                                                <label class="check-row"><input type="checkbox" id="notification-sessionAlerts" checked /><span>会话（CK）失效或即将过期时自动预警（每日去重）</span></label>
                                                 <label class="check-row"><input type="checkbox" id="notification-clear" /><span>清除已保存的渠道密钥</span></label>
                                             </div>
                                             <div class="form-actions">
@@ -721,6 +737,7 @@
                                                 <button class="seg__item is-active" type="button" data-state="completed">已完成</button>
                                                 <button class="seg__item" type="button" data-state="partial">部分完成</button>
                                                 <button class="seg__item" type="button" data-state="failed">运行失败</button>
+                                                <button class="seg__item" type="button" data-state="session_alert">CK 失效</button>
                                             </div>
                                         </div>
                                         <div class="notify-preview__stage" id="notify-preview-stage"></div>

@@ -1,8 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { lowMemoryConfig, writeJson, start, stopAll, waitForPort } from './runtime.mjs'
 import { createRunRecorder } from '../lib/run-recorder.mjs'
-import { notifyRun } from '../lib/notifications.mjs'
+import { notifyRun, notifySessionAlerts } from '../lib/notifications.mjs'
+import { recordSessionHealth } from '../lib/session-health.mjs'
 import { readQueryMode } from '../lib/task-settings.mjs'
 
 const root = process.env.BOT_DIR || '/opt/rewards'
@@ -113,8 +115,42 @@ try {
     if (browserClosed) await browserClosed
     const run = recorder?.finish(result, cancelled)
     if (run) {
-        try { await notifyRun(process.env.PANEL_CONFIG || '/data/panel.json', run) }
-        catch { console.error('[notification] 通知发送失败；签到结果已保存，请检查通知渠道设置。') }
+        const panelFile = process.env.PANEL_CONFIG || '/data/panel.json'
+        if (Array.isArray(run.sessionAlerts) && run.sessionAlerts.length) {
+            try {
+                const sessionTimestamps = new Map()
+                try {
+                    const cfg = JSON.parse(fs.readFileSync(path.join(root, 'config.json'), 'utf8'))
+                    const dbPath = path.resolve(root, cfg.sessionPath || 'sessions', 'sessions.db')
+                    if (fs.existsSync(dbPath)) {
+                        const sdb = new DatabaseSync(dbPath, { readOnly: true })
+                        try {
+                            for (const row of sdb.prepare('SELECT email, platform, updated_at FROM sessions').all()) {
+                                sessionTimestamps.set(`${String(row.email).toLowerCase()}|${row.platform}`, Number(row.updated_at) || null)
+                            }
+                        } finally { sdb.close() }
+                    }
+                } catch {}
+                recordSessionHealth(panelFile, run.sessionAlerts.map(item => ({
+                    ...item,
+                    sessionUpdatedAt: sessionTimestamps.get(`${item.email.toLowerCase()}|${item.platform}`) ?? null,
+                    checkedAt: Date.now()
+                })))
+            } catch (error) {
+                console.error(`[session-health] 写入会话失效状态失败：${error.message}`)
+            }
+        }
+        let runNotified = false
+        try {
+            const sent = await notifyRun(panelFile, run)
+            runNotified = Boolean(sent?.sent)
+        } catch {
+            console.error('[notification] 通知发送失败；签到结果已保存，请检查通知渠道设置。')
+        }
+        if (Array.isArray(run.sessionAlerts) && run.sessionAlerts.length && !runNotified) {
+            try { await notifySessionAlerts(panelFile, run.sessionAlerts, { source: 'runtime' }) }
+            catch { console.error('[notification] 会话失效提醒发送失败，请检查通知渠道设置。') }
+        }
     }
     clearTimeout(timeout)
 }
